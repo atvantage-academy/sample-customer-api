@@ -65,6 +65,12 @@ jobs:
 
       - name: Startseite erzeugen
         run: |
+          # Bewusst KEIN eigener Kopf, kein Hinweisbanner: Die Einordnung
+          # ("Musterloesung, nicht die einzige Loesung") und die Verweise auf
+          # Entwurf und Repository stehen in `info.description` des
+          # OpenAPI-Dokuments. Swagger UI rendert sie dort im eigenen Layout.
+          # Ein zusaetzliches Band darueber waere eine zweite Wahrheit - und
+          # saehe aus wie ein Zettel, den jemand an die Seite geklebt hat.
           cat > site/index.html <<'HTML'
           <!DOCTYPE html>
           <html lang="de">
@@ -74,32 +80,14 @@ jobs:
             <title>Account Service API – Musterlösung der ATVANTAGE Academy</title>
             <meta name="description" content="Musterlösung zur Entwurfsübung aus dem Training „REST APIs – Grundlagen und Design“.">
             <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+            <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
             <link rel="stylesheet" href="swagger-ui.css">
             <style>
+              html { color-scheme: light; }
               body { margin: 0; background: #fafafa; }
-              .hinweis {
-                font: 15px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
-                background: #fff; border-bottom: 1px solid #e3e3e3;
-                padding: 1.2rem 1.5rem;
-              }
-              .hinweis__inner { max-width: 1460px; margin: 0 auto; }
-              .hinweis strong { color: #1b1b1b; }
-              .hinweis a { color: #0a7d55; }
-              .hinweis p { margin: .3rem 0; }
             </style>
           </head>
           <body>
-            <div class="hinweis"><div class="hinweis__inner">
-              <p><strong>Musterlösung</strong> zur Entwurfsübung aus dem Training
-              „REST APIs – Grundlagen und Design“ der ATVANTAGE Academy –
-              <strong>eine</strong> mögliche Lösung, nicht die einzige richtige.</p>
-              <p>Der formlose Entwurf mit den Alternativen, die zur Diskussion standen:
-              <a href="https://github.com/atvantage-academy/sample-customer-api/blob/main/docs/design.md">docs/design.md</a>
-              · Quelle: <a href="https://github.com/atvantage-academy/sample-customer-api">GitHub</a>
-              · <a href="openapi.yaml">openapi.yaml</a></p>
-              <p><em>Die Schaltfläche „Try it out“ funktioniert hier nicht – hinter
-              den Adressen steht kein Server. Es ist ein Entwurf, keine laufende API.</em></p>
-            </div></div>
             <div id="swagger-ui"></div>
             <script src="swagger-ui-bundle.js" crossorigin></script>
             <script src="swagger-ui-standalone-preset.js" crossorigin></script>

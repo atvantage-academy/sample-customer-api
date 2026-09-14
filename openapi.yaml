@@ -9,9 +9,16 @@ info:
   description: |
     Verwaltung der Kundenkonten eines Online-Shops.
 
-    Diese Beschreibung ist eine **Musterlösung aus einer Schulung**, keine
-    betriebsbereite Schnittstelle. An mehreren Stellen wäre eine andere
-    Modellierung ebenso vertretbar; die Begründungen stehen in `docs/design.md`.
+    **Musterlösung zur Entwurfsübung** aus dem Training „REST APIs – Grundlagen
+    und Design“ der ATVANTAGE Academy – **eine** mögliche Lösung, nicht die
+    einzige richtige. An mehreren Stellen wäre eine andere Modellierung ebenso
+    vertretbar; die Begründungen stehen im
+    [formlosen Entwurf](https://github.com/atvantage-academy/sample-customer-api/blob/main/docs/design.md).
+
+    Hinter den Adressen steht **kein Server** – dies ist ein Entwurf, keine
+    laufende API. „Try it out“ ist deshalb abgeschaltet.
+
+    Quelle: [github.com/atvantage-academy/sample-customer-api](https://github.com/atvantage-academy/sample-customer-api)
   version: 1.0.0
   contact:
     name: ATVANTAGE Academy
