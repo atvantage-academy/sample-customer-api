@@ -1,0 +1,146 @@
+# =============================================================================
+# Swagger UI fuer openapi.yaml -> GitHub Pages
+# -----------------------------------------------------------------------------
+# Die Swagger UI wird bei jedem Lauf frisch aus dem npm-Paket swagger-ui-dist
+# geholt und zusammen mit openapi.yaml als statische Site veroeffentlicht.
+#
+# BEWUSST NICHT IM REPOSITORY: Frueher lag die entpackte Swagger UI als rund
+# 20 Dateien im Repo (eigener Branch). Das hatte drei Nachteile - die Fassung
+# veraltete still, jede Aktualisierung war ein Commit mit Megabytes an Diff, und
+# niemand konnte auf einen Blick sehen, welche Version eigentlich ausgeliefert
+# wird. Hier steht sie als PIN in einer Zeile (SWAGGER_UI_VERSION) und wird zur
+# Build-Zeit geladen.
+#
+# Voraussetzung (einmalig): Settings -> Pages -> Source: "GitHub Actions".
+# =============================================================================
+name: Swagger UI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Laeuft ein Deploy, wartet der naechste - aber ein laufender wird nicht
+# abgebrochen, sonst steht die Seite kurzzeitig auf einem halben Stand.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  SWAGGER_UI_VERSION: 5.32.15
+
+jobs:
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: OpenAPI-Dokument pruefen
+        run: npx --yes @redocly/cli@1 lint openapi.yaml --format stylish
+
+      - name: Swagger UI holen und Site zusammenstellen
+        run: |
+          set -euo pipefail
+          mkdir -p site
+          npm pack --silent --pack-destination /tmp "swagger-ui-dist@${SWAGGER_UI_VERSION}" > /tmp/tgz.txt
+          tar -xzf "/tmp/$(cat /tmp/tgz.txt)" -C /tmp
+          cp /tmp/package/swagger-ui.css \
+             /tmp/package/swagger-ui-bundle.js \
+             /tmp/package/swagger-ui-standalone-preset.js \
+             /tmp/package/favicon-16x16.png \
+             /tmp/package/favicon-32x32.png \
+             /tmp/package/oauth2-redirect.html \
+             site/
+          cp openapi.yaml site/
+          cp -r docs site/docs
+          cp README.md site/
+
+      - name: Startseite erzeugen
+        run: |
+          cat > site/index.html <<'HTML'
+          <!DOCTYPE html>
+          <html lang="de">
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>Account Service API – Musterlösung der ATVANTAGE Academy</title>
+            <meta name="description" content="Musterlösung zur Entwurfsübung aus dem Training „REST APIs – Grundlagen und Design“.">
+            <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+            <link rel="stylesheet" href="swagger-ui.css">
+            <style>
+              body { margin: 0; background: #fafafa; }
+              .hinweis {
+                font: 15px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
+                background: #fff; border-bottom: 1px solid #e3e3e3;
+                padding: 1.2rem 1.5rem;
+              }
+              .hinweis__inner { max-width: 1460px; margin: 0 auto; }
+              .hinweis strong { color: #1b1b1b; }
+              .hinweis a { color: #0a7d55; }
+              .hinweis p { margin: .3rem 0; }
+            </style>
+          </head>
+          <body>
+            <div class="hinweis"><div class="hinweis__inner">
+              <p><strong>Musterlösung</strong> zur Entwurfsübung aus dem Training
+              „REST APIs – Grundlagen und Design“ der ATVANTAGE Academy –
+              <strong>eine</strong> mögliche Lösung, nicht die einzige richtige.</p>
+              <p>Der formlose Entwurf mit den Alternativen, die zur Diskussion standen:
+              <a href="https://github.com/atvantage-academy/sample-customer-api/blob/main/docs/design.md">docs/design.md</a>
+              · Quelle: <a href="https://github.com/atvantage-academy/sample-customer-api">GitHub</a>
+              · <a href="openapi.yaml">openapi.yaml</a></p>
+              <p><em>Die Schaltfläche „Try it out“ funktioniert hier nicht – hinter
+              den Adressen steht kein Server. Es ist ein Entwurf, keine laufende API.</em></p>
+            </div></div>
+            <div id="swagger-ui"></div>
+            <script src="swagger-ui-bundle.js" crossorigin></script>
+            <script src="swagger-ui-standalone-preset.js" crossorigin></script>
+            <script>
+              window.ui = SwaggerUIBundle({
+                url: "openapi.yaml",
+                dom_id: "#swagger-ui",
+                deepLinking: true,
+                docExpansion: "list",
+                defaultModelsExpandDepth: 1,
+                tryItOutEnabled: false,
+                supportedSubmitMethods: [],
+                presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset],
+                plugins: [SwaggerUIBundle.plugins.DownloadUrl],
+                layout: "StandaloneLayout"
+              });
+            </script>
+          </body>
+          </html>
+          HTML
+
+      - name: Ergebnis pruefen
+        run: |
+          set -euo pipefail
+          test -s site/index.html      || { echo "FEHLER: index.html fehlt oder ist leer"; exit 1; }
+          test -s site/openapi.yaml    || { echo "FEHLER: openapi.yaml fehlt";            exit 1; }
+          test -s site/swagger-ui.css  || { echo "FEHLER: Swagger UI fehlt";              exit 1; }
+          echo "Site: $(find site -type f | wc -l) Dateien"
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    # Nur bei Push auf main. Ein Pull Request baut, veroeffentlicht aber nicht.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

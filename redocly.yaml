@@ -1,0 +1,18 @@
+# Regeln fuer `redocly lint openapi.yaml` (laeuft in der Pages-Pipeline).
+#
+# Grundlage ist das empfohlene Regelwerk. Zwei Regeln sind bewusst
+# ABGESCHALTET - beide beanstanden etwas, das hier Absicht ist:
+extends:
+  - recommended
+
+rules:
+  # Die Server-Adressen zeigen auf example.com, WEIL es keinen Server gibt.
+  # Dieses Dokument ist eine Musterloesung aus einer Schulung, kein Betrieb.
+  # Eine erfundene, echt aussehende Domain waere schlechter: Sie wuerde
+  # Lernende zum Ausprobieren verleiten und ins Leere laufen lassen.
+  no-server-example.com: off
+
+  # Keine Lizenzangabe: Die uebrigen Repositories der Organisation fuehren
+  # ebenfalls keine. Wird die Lizenzfrage org-weit entschieden, gehoert die
+  # Angabe nach `info.license` - und diese Zeile hier verschwindet.
+  info-license: off

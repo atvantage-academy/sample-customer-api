@@ -1,0 +1,686 @@
+# Musterlösung zum Training „REST APIs – Grundlagen und Design“
+# der ATVANTAGE Academy. Der formlose Entwurf, aus dem dieses Dokument
+# entstanden ist, liegt unter docs/design.md – dort stehen auch die
+# Alternativen, die im Kurs zur Diskussion standen.
+openapi: 3.1.0
+
+info:
+  title: Account Service API
+  description: |
+    Verwaltung der Kundenkonten eines Online-Shops.
+
+    Diese Beschreibung ist eine **Musterlösung aus einer Schulung**, keine
+    betriebsbereite Schnittstelle. An mehreren Stellen wäre eine andere
+    Modellierung ebenso vertretbar; die Begründungen stehen in `docs/design.md`.
+  version: 1.0.0
+  contact:
+    name: ATVANTAGE Academy
+    email: academy@atvantage.com
+
+servers:
+  - url: https://api.example.com/v1
+    description: Produktion
+  - url: https://api.test.example.com/v1
+    description: Testumgebung
+
+tags:
+  - name: customers
+    description: Kundenkonten anlegen, lesen, ändern und löschen
+  - name: address
+    description: Die Anschrift eines Kunden
+  - name: payments
+    description: Bezahldaten – bewusst getrennt vom Kunden, weil anders geschützt
+  - name: flags
+    description: Schalter am Kundenkonto, etwa die Deaktivierung
+
+# Standard für alle Operationen: lesender Zugriff. Schreibende Operationen
+# verschärfen das jeweils selbst.
+security:
+  - openId: [reader_access]
+
+paths:
+
+  /customers:
+    get:
+      tags: [customers]
+      operationId: readCustomers
+      summary: Alle Kunden lesen
+      description: |
+        Liefert die Kunden seitenweise. **Ohne Bezahldaten** – die liegen als
+        eigene Subressourcen, weil sie anders geschützt werden müssen.
+      parameters:
+        - name: state
+          in: query
+          description: Nur Kunden in diesem Zustand
+          schema:
+            $ref: '#/components/schemas/CustomerState'
+        - name: page
+          in: query
+          description: Seitennummer, beginnend bei 1
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: size
+          in: query
+          description: Einträge je Seite
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+      responses:
+        '200':
+          description: Die Kunden wurden gelesen
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomerList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+    post:
+      tags: [customers]
+      operationId: createCustomer
+      summary: Einen Kunden anlegen
+      description: |
+        Die Kennung vergibt der **Server**. Deshalb POST und nicht PUT – und
+        deshalb ist die Operation nicht idempotent: Zweimal gesendet heißt zwei
+        Kunden.
+      security:
+        - openId: [writer_access]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Customer'
+      responses:
+        '201':
+          description: Der Kunde wurde angelegt
+          headers:
+            Location:
+              description: Adresse des neuen Kunden
+              schema:
+                type: string
+                format: uri-reference
+                examples: ['/customers/3fa85f64-5717-4562-b3fc-2c963f66afa6']
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /customers/{id}:
+    parameters:
+      - $ref: '#/components/parameters/customerId'
+
+    get:
+      tags: [customers]
+      operationId: readCustomer
+      summary: Einen Kunden lesen
+      responses:
+        '200':
+          description: Der Kunde wurde gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [customers]
+      operationId: replaceCustomer
+      summary: Einen Kunden ersetzen
+      description: |
+        **Ersetzt den Datensatz vollständig.** Felder, die nicht mitgeschickt
+        werden, sind danach leer. Für Teiländerungen `PATCH` verwenden.
+      security:
+        - openId: [writer_access]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Customer'
+      responses:
+        '200':
+          description: Der Kunde wurde ersetzt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags: [customers]
+      operationId: updateCustomer
+      summary: Einzelne Felder eines Kunden ändern
+      security:
+        - openId: [writer_access]
+      requestBody:
+        required: true
+        content:
+          application/merge-patch+json:
+            schema:
+              $ref: '#/components/schemas/CustomerPatch'
+      responses:
+        '204':
+          description: Die Änderung wurde übernommen
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [customers]
+      operationId: deleteCustomer
+      summary: Einen Kunden löschen
+      description: |
+        Idempotent: Beim zweiten Aufruf ist der Kunde immer noch weg. Diese API
+        antwortet dann `404` – der Zustand ist derselbe, nur die Antwort
+        unterscheidet sich.
+      security:
+        - openId: [writer_access]
+      responses:
+        '204':
+          description: Der Kunde wurde gelöscht
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /customers/{id}/address:
+    parameters:
+      - $ref: '#/components/parameters/customerId'
+
+    get:
+      tags: [address]
+      operationId: readAddress
+      summary: Die Anschrift lesen
+      responses:
+        '200':
+          description: Die Anschrift wurde gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Address'
+        '404':
+          description: Kunde unbekannt oder ohne hinterlegte Anschrift
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+
+    put:
+      tags: [address]
+      operationId: replaceAddress
+      summary: Die Anschrift setzen oder ersetzen
+      description: |
+        Es gibt genau **eine** Anschrift, und der Client kennt ihren Inhalt
+        vollständig – deshalb PUT. Zweimal gesendet ändert nichts.
+      security:
+        - openId: [writer_access]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Address'
+      responses:
+        '204':
+          description: Die Anschrift wurde gesetzt
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /customers/{id}/payments:
+    parameters:
+      - $ref: '#/components/parameters/customerId'
+    get:
+      tags: [payments]
+      operationId: readPayments
+      summary: Alle hinterlegten Bezahldaten lesen
+      security:
+        - openId: [payment_access]
+      responses:
+        '200':
+          description: Die Bezahldaten wurden gelesen
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentOverview'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /customers/{id}/payments/paypal:
+    parameters:
+      - $ref: '#/components/parameters/customerId'
+    get:
+      tags: [payments]
+      operationId: readPayPal
+      summary: Die PayPal-Daten lesen
+      security:
+        - openId: [payment_access]
+      responses:
+        '200':
+          description: Die PayPal-Daten wurden gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PayPal'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Kunde unbekannt oder ohne PayPal-Daten
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    put:
+      tags: [payments]
+      operationId: replacePayPal
+      summary: Die PayPal-Daten setzen oder ersetzen
+      security:
+        - openId: [payment_access]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PayPal'
+      responses:
+        '204':
+          description: Die PayPal-Daten wurden gesetzt
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [payments]
+      operationId: deletePayPal
+      summary: Die PayPal-Daten entfernen
+      security:
+        - openId: [payment_access]
+      responses:
+        '204':
+          description: Die PayPal-Daten wurden entfernt
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /customers/{id}/payments/creditcard:
+    parameters:
+      - $ref: '#/components/parameters/customerId'
+    get:
+      tags: [payments]
+      operationId: readCreditCard
+      summary: Die Kreditkartendaten lesen
+      security:
+        - openId: [payment_access]
+      responses:
+        '200':
+          description: Die Kreditkartendaten wurden gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreditCard'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Kunde unbekannt oder ohne Kreditkartendaten
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    put:
+      tags: [payments]
+      operationId: replaceCreditCard
+      summary: Die Kreditkartendaten setzen oder ersetzen
+      security:
+        - openId: [payment_access]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreditCard'
+      responses:
+        '204':
+          description: Die Kreditkartendaten wurden gesetzt
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [payments]
+      operationId: deleteCreditCard
+      summary: Die Kreditkartendaten entfernen
+      security:
+        - openId: [payment_access]
+      responses:
+        '204':
+          description: Die Kreditkartendaten wurden entfernt
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /customers/{id}/flags/deactivation:
+    parameters:
+      - $ref: '#/components/parameters/customerId'
+    description: |
+      Der Deaktivierungs-Schalter. Gesetzt = Konto deaktiviert.
+
+      Bewusst als Schalter und nicht als Aktion modelliert: So sind Deaktivieren
+      und Aktivieren **idempotent** und der Zustand ist einzeln abfragbar. Die
+      Alternativen (Statusfeld per PATCH, Aktivitätsressource per POST) stehen
+      samt Begründung in `docs/design.md`.
+    get:
+      tags: [flags]
+      operationId: readDeactivationFlag
+      summary: Ist das Konto deaktiviert?
+      responses:
+        '200':
+          description: Der Schalter ist gesetzt – das Konto ist deaktiviert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeactivationFlag'
+        '404':
+          description: Kunde unbekannt, oder der Schalter ist nicht gesetzt
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    put:
+      tags: [flags]
+      operationId: setDeactivationFlag
+      summary: Das Konto deaktivieren
+      security:
+        - openId: [writer_access]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeactivationFlag'
+      responses:
+        '204':
+          description: Das Konto ist deaktiviert – auch wenn es das vorher schon war
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [flags]
+      operationId: clearDeactivationFlag
+      summary: Das Konto wieder aktivieren
+      security:
+        - openId: [writer_access]
+      responses:
+        '204':
+          description: Das Konto ist aktiv – auch wenn es das vorher schon war
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+
+  parameters:
+    customerId:
+      name: id
+      in: path
+      required: true
+      description: Die Kennung des Kunden
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    BadRequest:
+      description: Die Anfrage ist nicht gültig
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ValidationProblem'
+    Forbidden:
+      description: Für diese Operation fehlt die Berechtigung
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    NotFound:
+      description: Diese Ressource gibt es nicht
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+
+  schemas:
+
+    CustomerState:
+      type: string
+      description: Der Zustand eines Kundenkontos
+      enum: [aktiv, deaktiviert, gesperrt]
+
+    Customer:
+      type: object
+      required: [name, birthdate]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+          description: |
+            Vom Server vergeben und unveränderlich. `readOnly` heißt: kommt beim
+            Lesen mit, wird beim Anlegen nicht mitgeschickt – deshalb braucht es
+            kein zweites Schema.
+        name:
+          type: string
+          minLength: 3
+          maxLength: 100
+          examples: ['Tom Mayer']
+        birthdate:
+          type: string
+          format: date
+          examples: ['1985-07-14']
+        state:
+          allOf:
+            - $ref: '#/components/schemas/CustomerState'
+          readOnly: true
+          description: |
+            Nur lesbar. Geändert wird der Zustand über
+            `/customers/{id}/flags/deactivation`.
+
+    CustomerPatch:
+      type: object
+      description: Nur die Felder, die geändert werden sollen
+      properties:
+        name:
+          type: string
+          minLength: 3
+          maxLength: 100
+        birthdate:
+          type: string
+          format: date
+
+    CustomerList:
+      type: object
+      description: |
+        **Ein Objekt, kein nacktes Array.** Nur so lassen sich Gesamtzahl,
+        Seitenangaben oder Verweise später ergänzen, ohne Aufrufer zu brechen.
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Customer'
+        total:
+          type: integer
+          description: Gesamtzahl über alle Seiten
+          examples: [1242]
+        page:
+          type: integer
+          examples: [1]
+        size:
+          type: integer
+          examples: [50]
+
+    Address:
+      type: object
+      required: [street, zip, city]
+      properties:
+        street:
+          type: string
+          minLength: 3
+          maxLength: 100
+        number:
+          type: string
+          maxLength: 10
+        zip:
+          type: string
+          pattern: '^[0-9]{5}$'
+          description: Fünfstellig – diese API bildet nur deutsche Anschriften ab.
+        city:
+          type: string
+          minLength: 1
+          maxLength: 100
+
+    PayPal:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 100
+
+    CreditCard:
+      type: object
+      required: [number, validity]
+      properties:
+        number:
+          type: string
+          minLength: 8
+          maxLength: 19
+          description: Wird beim Lesen maskiert zurückgegeben.
+        validity:
+          type: string
+          pattern: '^[0-9]{2}/[0-9]{2}$'
+          examples: ['09/28']
+        cvc:
+          type: string
+          pattern: '^[0-9]{3}$'
+          writeOnly: true
+          description: Wird nie zurückgegeben.
+
+    PaymentOverview:
+      type: object
+      description: Welche Bezahlarten hinterlegt sind
+      properties:
+        paypal:
+          $ref: '#/components/schemas/PayPal'
+        creditcard:
+          $ref: '#/components/schemas/CreditCard'
+
+    DeactivationFlag:
+      type: object
+      properties:
+        reason:
+          type: string
+          maxLength: 200
+          description: Optionaler Grund der Deaktivierung
+        since:
+          type: string
+          format: date-time
+          readOnly: true
+
+    Problem:
+      type: object
+      description: Fehlerformat nach RFC 9457 (Problem Details for HTTP APIs)
+      properties:
+        type:
+          type: string
+          format: uri
+          description: |
+            Die Fehlerkennung – **das einzige Feld, auf das ein Programm Logik
+            bauen darf.**
+          examples: ['https://api.example.com/problems/not-found']
+        title:
+          type: string
+          description: Kurze Beschreibung für Menschen; darf sich ändern.
+        status:
+          type: integer
+          examples: [404]
+        detail:
+          type: string
+          description: Beschreibung dieses konkreten Falls; darf sich ändern.
+        instance:
+          type: string
+          format: uri-reference
+
+    ValidationProblem:
+      allOf:
+        - $ref: '#/components/schemas/Problem'
+        - type: object
+          properties:
+            errors:
+              type: array
+              description: |
+                **Alle** fehlerhaften Felder auf einmal – sonst braucht der
+                Aufrufer mehrere Anläufe.
+              items:
+                type: object
+                properties:
+                  field:
+                    type: string
+                    examples: ['name']
+                  message:
+                    type: string
+                    examples: ['mindestens 3 Zeichen']
+
+  securitySchemes:
+    openId:
+      type: oauth2
+      description: |
+        **Im Kurs nicht behandelt.** Authentifizierung und Autorisierung erledigt
+        üblicherweise das API Gateway *vor* dem Service – im Code der
+        Implementierung steht davon nichts. Hier nur, damit die Beschreibung
+        vollständig ist und man sieht, welche Berechtigung welche Operation
+        verlangt.
+
+        Die Berechtigungen sind bewusst grob geschnitten: lesen, schreiben, und
+        Bezahldaten getrennt davon. Genau deshalb liegen die Bezahldaten als
+        eigene Subressourcen und nicht als Felder des Kunden – eine Berechtigung
+        auf Feldebene kann HTTP nicht ausdrücken.
+      flows:
+        authorizationCode:
+          authorizationUrl: https://auth.example.com/authorize
+          tokenUrl: https://auth.example.com/token
+          scopes:
+            reader_access: Kundendaten lesen
+            writer_access: Kundendaten anlegen, ändern und löschen
+            payment_access: Bezahldaten lesen und ändern
