@@ -52,9 +52,12 @@ jobs:
           mkdir -p site
           npm pack --silent --pack-destination /tmp "swagger-ui-dist@${SWAGGER_UI_VERSION}" > /tmp/tgz.txt
           tar -xzf "/tmp/$(cat /tmp/tgz.txt)" -C /tmp
+          # swagger-ui-standalone-preset.js wird NICHT kopiert: Es liefert
+          # ausschliesslich die Topbar (SmartBear-Logo + Eingabefeld fuer eine
+          # beliebige andere Beschreibung). Die Seite nutzt BaseLayout, damit
+          # entfaellt die Leiste - und rund 300 KB Uebertragung dazu.
           cp /tmp/package/swagger-ui.css \
              /tmp/package/swagger-ui-bundle.js \
-             /tmp/package/swagger-ui-standalone-preset.js \
              /tmp/package/favicon-16x16.png \
              /tmp/package/favicon-32x32.png \
              /tmp/package/oauth2-redirect.html \
@@ -90,7 +93,6 @@ jobs:
           <body>
             <div id="swagger-ui"></div>
             <script src="swagger-ui-bundle.js" crossorigin></script>
-            <script src="swagger-ui-standalone-preset.js" crossorigin></script>
             <script>
               window.ui = SwaggerUIBundle({
                 url: "openapi.yaml",
@@ -100,9 +102,14 @@ jobs:
                 defaultModelsExpandDepth: 1,
                 tryItOutEnabled: false,
                 supportedSubmitMethods: [],
-                presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset],
+                presets: [SwaggerUIBundle.presets.apis],
                 plugins: [SwaggerUIBundle.plugins.DownloadUrl],
-                layout: "StandaloneLayout"
+                // BaseLayout statt StandaloneLayout: Damit entfaellt die schwarze
+                // Topbar mit dem SmartBear-Logo und dem Eingabefeld, ueber das
+                // sich eine beliebige andere Beschreibung laden liesse. Beides
+                // gehoert nicht auf eine Schulungsunterlage. Servers-Auswahl,
+                // Authorize und die Info-Sektion bleiben erhalten.
+                layout: "BaseLayout"
               });
             </script>
           </body>
