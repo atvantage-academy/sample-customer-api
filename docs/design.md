@@ -1,15 +1,17 @@
 # Account Service – der formlose Entwurf
 
 So sieht das Ergebnis des ersten Kurstages aus: formlos, aber vollständig genug,
-dass ein anderes Team damit arbeiten kann. Kein OpenAPI, keine Security – das kommt
-später bzw. in einem eigenen Kurs.
+dass ein anderes Team damit arbeiten kann. Um Security kümmert sich der Entwurf
+zunächst nicht – in diesem Stand kommt sie als eigener Abschnitt dazu, weil sie
+den Ressourcenschnitt begründet.
 
 **Annahme durchgehend:** JSON ist das einzige Austauschformat. `Accept` und
 `Content-Type` sind deshalb unten nicht bei jeder Operation erwähnt.
 
-> **Dies ist der Stand `03-hypermedia-hal`.** Er baut auf `02-problem-details` auf
-> und ergänzt HAL – siehe [Hypermedia](#hypermedia). Die übrigen Stände stehen
-> unten unter [Weiterführende Stände](#weiterführende-stände).
+> **Dies ist der Stand `04-autorisierung` – der letzte.** Er baut auf
+> `03-hypermedia-hal` auf und ergänzt, wer was darf – siehe
+> [Wer darf was](#wer-darf-was). Hier ist die API vollständig; die übrigen Stände
+> stehen unten unter [Weiterführende Stände](#weiterführende-stände).
 
 ## Die Daten
 
@@ -431,9 +433,66 @@ ist hier Absicht, nicht Schlamperei.
 Und was **nicht** hineingehört: Stacktraces, Klassennamen, SQL-Fragmente, Pfade.
 Eine Fehlerantwort geht nach außen.
 
+## Wer darf was
+
+Vier Berechtigungen, grob geschnitten:
+
+| Scope | Erlaubt |
+| ----- | ------- |
+| `reader_access` | Kundendaten lesen |
+| `writer_access` | Kundendaten anlegen, ändern, löschen; deaktivieren und wieder aktivieren |
+| `payment_access` | Bezahldaten lesen und ändern |
+| `lock_access` | Konten sperren und entsperren |
+
+**`lock_access` ist bewusst getrennt von `writer_access`**, weil die Sperre ein
+anderer Vorgang ist als eine Änderung am Kunden: Sie gehört dem Betreiber, nicht
+dem Kundenservice. Wer Namen korrigieren darf, darf deshalb noch lange nicht
+sperren.
+
+### Und deshalb liegen die Bezahldaten als eigene Ressourcen
+
+Das ist der Punkt, an dem der Ressourcenschnitt vom ersten Kurstag seine Rechnung
+präsentiert. Wären die Bezahldaten **Felder des Kunden**, müsste `payment_access`
+auf Feldebene greifen:
+
+> „`GET /customers/{id}` darf jeder mit `reader_access`, aber die Felder `paypal`
+> und `creditcard` nur, wer zusätzlich `payment_access` hat.“
+
+**Das kann HTTP nicht.** Berechtigungen hängen an Adressen, nicht an Feldern. Als
+eigene Subressource ist die Regel dagegen trivial – und ein Gateway kann sie
+durchsetzen, ohne den Body zu kennen.
+
+*Die Gegenprobe:* Wer die Bezahldaten doch einbettet, braucht zwei verschiedene
+Darstellungen derselben Ressource und muss im Service entscheiden, welche er
+ausliefert. Die Berechtigungsprüfung wandert damit aus dem Gateway in den Code.
+
+### `401` und `403` – der Unterschied
+
+| Code | Heißt | Hilft ein zweiter Versuch? |
+| ---- | ----- | -------------------------- |
+| `401` Unauthorized | *Ich weiß nicht, wer Du bist.* Kein Token, abgelaufen, ungültig. | Ja – mit gültigem Token. |
+| `403` Forbidden | *Ich weiß, wer Du bist, und Du darfst das nicht.* | Nein – nicht mit diesem Token. |
+
+`401` ist eine **Frage nach dem Ausweis**, `403` eine **Ablehnung trotz Ausweis**.
+Der Name von `401` ist historisch falsch – gemeint ist *unauthenticated*, nicht
+*unauthorized*. Das ist der Grund, warum die beiden so zuverlässig verwechselt
+werden.
+
+*Und die Frage, die daraus folgt:* Was antwortet man, wenn jemand ohne
+Berechtigung auf eine Ressource zugreift, die es **gar nicht gibt**? `403` verrät,
+dass es sie gäbe. `404` verrät nichts – und lügt. Beides ist vertretbar; die
+Entscheidung hängt daran, ob die bloße Existenz einer Kennung schützenswert ist.
+
+### Was hier nicht steht
+
+Wie Tokens ausgestellt, geprüft und erneuert werden. Wie Scopes vergeben werden.
+Was ein Gateway sonst noch tut – Rate Limiting, mTLS, Schlüsselrotation. **API
+Security ist ein eigener Kurs**, kein Kapitel. Hier steht nur, was der *Entwurf*
+davon wissen muss: welche Operation welche Berechtigung verlangt.
+
 ## Weiterführende Stände
 
-Dieser Entwurf ist der Stand `03-hypermedia-hal`. Er baut auf `02-problem-details` auf, und
+Dieser Entwurf ist der Stand `04-autorisierung`. Er baut auf `03-hypermedia-hal` auf, und
 darüber liegen weitere Stände. Die Swagger UI schaltet oben links zwischen ihnen
 um.
 
@@ -442,8 +501,8 @@ um.
 | [`main`](https://atvantage-academy.github.io/sample-customer-api/?spec=main) | Der Kern: Ressourcen, Methoden, Statuscodes, Schemas | – | – |
 | [`01-paginierung`](https://atvantage-academy.github.io/sample-customer-api/?spec=01-paginierung) | Cursorbasiertes Blättern über die Kundenliste | Best Practices | [PR #2](https://github.com/atvantage-academy/sample-customer-api/pull/2) |
 | [`02-problem-details`](https://atvantage-academy.github.io/sample-customer-api/?spec=02-problem-details) | Fehlerformat nach RFC 9457 statt des eigenen | Best Practices | [PR #3](https://github.com/atvantage-academy/sample-customer-api/pull/3) |
-| `03-hypermedia-hal` **· Du bist hier** | HAL: Die Antwort trägt ihre nächsten Schritte mit | Hypermedia und HAL | [PR #4](https://github.com/atvantage-academy/sample-customer-api/pull/4) |
-| [`04-autorisierung`](https://atvantage-academy.github.io/sample-customer-api/?spec=04-autorisierung) | OAuth 2, Scopes, `401` und `403` | Rund um die API | [PR #5](https://github.com/atvantage-academy/sample-customer-api/pull/5) |
+| [`03-hypermedia-hal`](https://atvantage-academy.github.io/sample-customer-api/?spec=03-hypermedia-hal) | HAL: Die Antwort trägt ihre nächsten Schritte mit | Hypermedia und HAL | [PR #4](https://github.com/atvantage-academy/sample-customer-api/pull/4) |
+| `04-autorisierung` **· Du bist hier** | OAuth 2, Scopes, `401` und `403` | Rund um die API | [PR #5](https://github.com/atvantage-academy/sample-customer-api/pull/5) |
 
 Was jeder Stand konkret ändert und **warum**, steht in der `README.md` des
 jeweiligen Branches. Die **Diff**-Spalte führt zu einem Pull Request gegen die Zeile

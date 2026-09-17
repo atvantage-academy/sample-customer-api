@@ -1,4 +1,4 @@
-# Musterlösung: Account Service API — 03 · Hypermedia (HAL)
+# Musterlösung: Account Service API — 04 · Autorisierung
 
 Die **Musterlösung** zur Entwurfsübung aus dem Training
 **„REST APIs – Grundlagen und Design“** der [ATVANTAGE Academy](https://atvantage.com).
@@ -18,88 +18,62 @@ richtige.
 
 ## Was dieser Stand ändert
 
-Die Kunden-Antworten bekommen eine **zweite Darstellung**: `application/hal+json`
-mit einem `_links`-Block. Die alte unter `application/json` bleibt unverändert.
+Der **letzte** Stand – hier ist die API vollständig. Jede Operation sagt, welche
+Berechtigung sie verlangt, und kann mit `401` oder `403` antworten.
 
-| | `02-problem-details` | `03-hypermedia-hal` |
+| | `03-hypermedia-hal` | `04-autorisierung` |
 | --- | --- | --- |
-| Kunde lesen | `application/json` | zusätzlich `application/hal+json` |
-| Liste lesen | `{ items, nextCursor }` | zusätzlich `{ _links, _embedded }` |
-| Nächste Seite | Cursor selbst anhängen | dem `_links.next` folgen |
+| Security | keine | OAuth 2, Authorization Code |
+| Voreinstellung | – | `reader_access` für alles |
+| Antworten | 2xx, 400, 404, 409 | zusätzlich **401** und **403** an allen 21 Operationen |
+| Prüfregel | `security-defined: off` | wieder eingeschaltet |
 
-```
-GET /customers/{id}
-Accept: application/hal+json
+### Die vier Berechtigungen
 
-→ 200
-{
-  "id": "3fa85f64-…", "name": "Tom Mayer", "state": "aktiv",
-  "_links": {
-    "self":       { "href": "/customers/3fa85f64-…" },
-    "address":    { "href": "/customers/3fa85f64-…/address" },
-    "payments":   { "href": "/customers/3fa85f64-…/payments" },
-    "deactivate": { "href": "/customers/3fa85f64-…/flags/deactivation" },
-    "lock":       { "href": "/customers/3fa85f64-…/flags/lock" }
-  }
-}
-```
+| Scope | Erlaubt |
+| ----- | ------- |
+| `reader_access` | Kundendaten lesen |
+| `writer_access` | Kundendaten anlegen, ändern, löschen; deaktivieren und wieder aktivieren |
+| `payment_access` | Bezahldaten lesen und ändern |
+| `lock_access` | Konten sperren und entsperren |
 
-### Der eigentliche Punkt: Die Verweise hängen vom Zustand ab
+**`lock_access` ist bewusst von `writer_access` getrennt.** Die Sperre gehört dem
+Betreiber, nicht dem Kundenservice – wer Namen korrigieren darf, darf deshalb noch
+lange nicht sperren.
 
-| `state` | vorhandene Beziehungen |
-| ------- | ---------------------- |
-| `aktiv` | `self`, `address`, `payments`, `deactivate`, `lock` |
-| `deaktiviert` | `self`, `address`, `payments`, `activate`, `lock` |
-| `gesperrt` | `self`, `address`, `payments`, `unlock` |
+### `401` und `403` – der Unterschied
 
-Ein gesperrtes Konto lässt sich nicht deaktivieren – also fehlt der Verweis. Ein
-deaktiviertes lässt sich sehr wohl sperren – also ist `lock` da.
+| Code | Heißt | Hilft ein zweiter Versuch? |
+| ---- | ----- | -------------------------- |
+| `401` Unauthorized | *Ich weiß nicht, wer Du bist.* Kein Token, abgelaufen, ungültig. | Ja – mit gültigem Token. |
+| `403` Forbidden | *Ich weiß, wer Du bist, und Du darfst das nicht.* | Nein – nicht mit diesem Token. |
 
-Dieselbe Regel stand vorher in der Dokumentation. Jetzt steht sie **in der
-Antwort**. Eine Oberfläche kann ihre Knöpfe daraus bauen, ohne zu wissen, was ein
-gesperrtes Konto ist; ändert sich die Regel, zieht sie ohne Änderung mit.
+`401` ist eine Frage nach dem Ausweis, `403` eine Ablehnung trotz Ausweis. Der
+Name von `401` ist historisch falsch – gemeint ist *unauthenticated*. Deshalb
+werden die beiden so zuverlässig verwechselt.
 
-**Genau dafür lohnt sich Hypermedia** – und meistens nur dafür: Abläufe mit
-mehreren Zuständen, bei denen nicht jeder Schritt immer erlaubt ist.
+### Und hier zahlt sich der Ressourcenschnitt aus
 
-### Und hier hört HAL auf
+Wären die Bezahldaten **Felder des Kunden**, müsste `payment_access` auf Feldebene
+greifen: „`GET /customers/{id}` darf jeder, aber die Felder `paypal` und
+`creditcard` nur mit zusätzlicher Berechtigung.“ **Das kann HTTP nicht** –
+Berechtigungen hängen an Adressen, nicht an Feldern.
 
-Ein HAL-Link kennt `href`. **Eine Methode kennt er nicht.**
+Als eigene Subressource ist die Regel trivial, und ein Gateway kann sie
+durchsetzen, ohne den Body zu kennen. Genau deshalb wurde am ersten Kurstag so
+geschnitten, auch wenn der Grund damals noch nicht auf dem Tisch lag.
 
-`deactivate` und `activate` zeigen auf dieselbe Adresse. Der eine meint `PUT`, der
-andere `DELETE`. In der Antwort steht davon nichts – die Bedeutung steckt allein im
-Namen der Beziehung, und den muss der Client vorher kennen. Wer die Methode
-mitliefern will, braucht HAL-FORMS, Siren oder JSON:API.
+### Was hier nicht steht
 
-Eine zweite Grenze zeigt sich in der Beschreibung selbst: Dass `deactivate` nur bei
-`aktiv` vorkommt, steht dort in **Prosa**. OpenAPI kann „dieses Feld gibt es nur,
-wenn `state` gleich `aktiv` ist“ nicht ausdrücken, ohne das Schema in drei
-`oneOf`-Varianten zu zerlegen – was die Beschreibung verdreifacht und kaum jemand
-liest.
+Wie Tokens ausgestellt, geprüft und erneuert werden. Wie Scopes vergeben werden.
+Rate Limiting, mTLS, Schlüsselrotation. **API Security ist ein eigener Kurs**,
+kein Kapitel – hier steht nur, was der Entwurf davon wissen muss.
 
-### Warum das kein Bruch ist
-
-`_embedded.customers` statt `items` wäre für jeden bestehenden Aufrufer ein Bruch.
-Deshalb wird HAL nicht eingebaut, sondern **danebengestellt**:
-
-```
-Accept: application/json       → { "items": [ … ], "nextCursor": … }   wie bisher
-Accept: application/hal+json   → { "_links": …, "_embedded": … }       neu
-```
-
-Eine Ressource, zwei Darstellungen, der Client wählt. Content Negotiation ist die
-eleganteste Antwort auf „wir müssen das Format ändern“, die HTTP zu bieten hat.
-
-In der Swagger UI steht `application/hal+json` **an erster Stelle** – Du siehst
-dort also die HAL-Antwort, ohne etwas umzuschalten. Über das Feld *Media type*
-über dem Beispiel kommst Du zur gewohnten Darstellung zurück und siehst den
-Unterschied unmittelbar.
-
-Ausführlich in [`docs/design.md`](docs/design.md#hypermedia).
+Ausführlich in [`docs/design.md`](docs/design.md#wer-darf-was).
 
 ## Die Stände
 
-Du bist im Stand `03-hypermedia-hal`. Er baut auf `02-problem-details` auf – jeder Stand
+Du bist im Stand `04-autorisierung`. Er baut auf `03-hypermedia-hal` auf – jeder Stand
 ergänzt genau ein Thema, sodass der letzte die vollständige API zeigt. In der
 Swagger UI schaltest Du oben links zwischen ihnen um.
 
@@ -108,8 +82,8 @@ Swagger UI schaltest Du oben links zwischen ihnen um.
 | [`main`](https://atvantage-academy.github.io/sample-customer-api/?spec=main) | Der Kern: Ressourcen, Methoden, Statuscodes, Schemas | [Swagger UI](https://atvantage-academy.github.io/sample-customer-api/?spec=main) · [YAML](../../blob/main/openapi.yaml) | – |
 | [`01-paginierung`](https://atvantage-academy.github.io/sample-customer-api/?spec=01-paginierung) | Cursorbasiertes Blättern über die Kundenliste | [Swagger UI](https://atvantage-academy.github.io/sample-customer-api/?spec=01-paginierung) · [YAML](../../blob/01-paginierung/openapi.yaml) | [PR #2](https://github.com/atvantage-academy/sample-customer-api/pull/2) |
 | [`02-problem-details`](https://atvantage-academy.github.io/sample-customer-api/?spec=02-problem-details) | Fehlerformat nach RFC 9457 statt des eigenen | [Swagger UI](https://atvantage-academy.github.io/sample-customer-api/?spec=02-problem-details) · [YAML](../../blob/02-problem-details/openapi.yaml) | [PR #3](https://github.com/atvantage-academy/sample-customer-api/pull/3) |
-| `03-hypermedia-hal` **· Du bist hier** | HAL: Die Antwort trägt ihre nächsten Schritte mit | [Swagger UI](https://atvantage-academy.github.io/sample-customer-api/?spec=03-hypermedia-hal) · [YAML](../../blob/03-hypermedia-hal/openapi.yaml) | [PR #4](https://github.com/atvantage-academy/sample-customer-api/pull/4) |
-| [`04-autorisierung`](https://atvantage-academy.github.io/sample-customer-api/?spec=04-autorisierung) | OAuth 2, Scopes, `401` und `403` | [Swagger UI](https://atvantage-academy.github.io/sample-customer-api/?spec=04-autorisierung) · [YAML](../../blob/04-autorisierung/openapi.yaml) | [PR #5](https://github.com/atvantage-academy/sample-customer-api/pull/5) |
+| [`03-hypermedia-hal`](https://atvantage-academy.github.io/sample-customer-api/?spec=03-hypermedia-hal) | HAL: Die Antwort trägt ihre nächsten Schritte mit | [Swagger UI](https://atvantage-academy.github.io/sample-customer-api/?spec=03-hypermedia-hal) · [YAML](../../blob/03-hypermedia-hal/openapi.yaml) | [PR #4](https://github.com/atvantage-academy/sample-customer-api/pull/4) |
+| `04-autorisierung` **· Du bist hier** | OAuth 2, Scopes, `401` und `403` | [Swagger UI](https://atvantage-academy.github.io/sample-customer-api/?spec=04-autorisierung) · [YAML](../../blob/04-autorisierung/openapi.yaml) | [PR #5](https://github.com/atvantage-academy/sample-customer-api/pull/5) |
 
 **Die Diff-Spalte ist der interessanteste Teil.** Jeder Stand hat einen Pull
 Request gegen die Zeile darüber, und der bleibt **bewusst offen** – er wird nie
