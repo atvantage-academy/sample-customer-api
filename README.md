@@ -1,4 +1,4 @@
-# Musterlösung: Account Service API
+# Musterlösung: Account Service API — 01 · Paginierung
 
 Die **Musterlösung** zur Entwurfsübung aus dem Training
 **„REST APIs – Grundlagen und Design“** der [ATVANTAGE Academy](https://atvantage.com).
@@ -16,20 +16,67 @@ richtige.
 | [`openapi.yaml`](openapi.yaml) | Derselbe Entwurf als **OpenAPI 3.1** – das Ergebnis des zweiten Tages. |
 | [Swagger UI](https://atvantage-academy.github.io/sample-customer-api/) | Dieselbe Beschreibung als **durchsuchbare Dokumentation** zum Anklicken. |
 
+## Was dieser Stand ändert
+
+`GET /customers` gibt die Kunden nicht mehr am Stück heraus, sondern
+**seitenweise** – und zwar cursorbasiert.
+
+| | `main` | `01-paginierung` |
+| --- | --- | --- |
+| Parameter | `state` | `state`, **`cursor`**, **`limit`** |
+| Antwort | `{ items }` | `{ items, `**`nextCursor`**` }` |
+| `400` | ungültiger Parameter | zusätzlich: Cursor abgelaufen |
+
+```
+GET /customers?limit=50
+→ 200  { "items": [ 50 Kunden ], "nextCursor": "eyJhZnRlciI6IjkxYzAxZjIzIn0" }
+
+GET /customers?limit=50&cursor=eyJhZnRlciI6IjkxYzAxZjIzIn0
+→ 200  { "items": [ die nächsten 50 ], "nextCursor": null }
+```
+
+`nextCursor: null` heißt: Das war die letzte Seite.
+
+### Warum ein Cursor und keine Seitennummer
+
+Seitenbasiertes Blättern macht eine Annahme, die nicht hält: **dass sich der
+Bestand zwischen zwei Anfragen nicht ändert.**
+
+> Seite 1 liefert die Kunden 1–50. Bevor der Aufrufer Seite 2 holt, wird Kunde 3
+> gelöscht. Alles rutscht eine Position nach vorn – der frühere Kunde 51 steht
+> jetzt auf Position 50. Seite 2 beginnt bei 51. **Ein Kunde wurde nie
+> ausgeliefert**, und niemand merkt es: Jede einzelne Antwort war korrekt.
+
+Umgekehrt genauso: Wird jemand eingefügt, erscheint ein Eintrag zweimal. Der
+Cursor macht diese Annahme nicht – er beschreibt keine Position in einer Liste,
+sondern einen Punkt im Bestand.
+
+**Der Preis:** Man kann nicht auf Seite 7 springen. Wer eine Oberfläche mit
+Seitenzahlen braucht, nimmt `page`/`size` und lebt mit den Sprüngen. Die
+Entscheidungsfrage lautet: Blättert jemand durch, oder arbeitet etwas die Liste
+ab?
+
+### Und was daran didaktisch interessant ist
+
+Dieser Stand ändert eine bestehende Antwort, **ohne einen einzigen Aufrufer zu
+brechen** – weil `main` die Liste als Objekt modelliert hat und nicht als nacktes
+Array. `nextCursor` ist ein neues Feld in einem bestehenden Objekt; wer es nicht
+kennt, übersieht es. Wäre die Antwort ein Array gewesen, hätte die Paginierung sie
+ersetzen müssen, und das ist ein Bruch.
+
+Die ausführliche Begründung samt Alternativen steht in
+[`docs/design.md`](docs/design.md#eine-million-kunden).
+
 ## Die Stände
 
-Dieser Branch – `main` – ist **der Kern**: Ressourcen, Methoden, Statuscodes,
-Schemas. Mehr nicht, und das mit Absicht. Wer den Entwurf aus der Übung
-nachvollziehen will, ist hier richtig.
-
-Die weiterführenden Themen des Kurses liegen in **eigenen Branches**. Jeder baut
-auf dem vorigen auf, sodass der letzte die vollständige API zeigt. In der Swagger
-UI schaltest Du oben links zwischen ihnen um.
+Du bist im Stand `01-paginierung`. Er baut auf `main` auf – jeder Stand
+ergänzt genau ein Thema, sodass der letzte die vollständige API zeigt. In der
+Swagger UI schaltest Du oben links zwischen ihnen um.
 
 | Stand | Was dazukommt | Ansehen | Diff |
 | ----- | ------------- | ------- | ---- |
-| `main` **· Du bist hier** | Der Kern: Ressourcen, Methoden, Statuscodes, Schemas | [Swagger UI](https://atvantage-academy.github.io/sample-customer-api/?spec=main) · [YAML](../../blob/main/openapi.yaml) | – |
-| [`01-paginierung`](https://atvantage-academy.github.io/sample-customer-api/?spec=01-paginierung) | Cursorbasiertes Blättern über die Kundenliste | [Swagger UI](https://atvantage-academy.github.io/sample-customer-api/?spec=01-paginierung) · [YAML](../../blob/01-paginierung/openapi.yaml) | [PR #2](https://github.com/atvantage-academy/sample-customer-api/pull/2) |
+| [`main`](https://atvantage-academy.github.io/sample-customer-api/?spec=main) | Der Kern: Ressourcen, Methoden, Statuscodes, Schemas | [Swagger UI](https://atvantage-academy.github.io/sample-customer-api/?spec=main) · [YAML](../../blob/main/openapi.yaml) | – |
+| `01-paginierung` **· Du bist hier** | Cursorbasiertes Blättern über die Kundenliste | [Swagger UI](https://atvantage-academy.github.io/sample-customer-api/?spec=01-paginierung) · [YAML](../../blob/01-paginierung/openapi.yaml) | [PR #2](https://github.com/atvantage-academy/sample-customer-api/pull/2) |
 | [`02-problem-details`](https://atvantage-academy.github.io/sample-customer-api/?spec=02-problem-details) | Fehlerformat nach RFC 9457 statt des eigenen | [Swagger UI](https://atvantage-academy.github.io/sample-customer-api/?spec=02-problem-details) · [YAML](../../blob/02-problem-details/openapi.yaml) | [PR #3](https://github.com/atvantage-academy/sample-customer-api/pull/3) |
 | [`03-hypermedia-hal`](https://atvantage-academy.github.io/sample-customer-api/?spec=03-hypermedia-hal) | HAL: Die Antwort trägt ihre nächsten Schritte mit | [Swagger UI](https://atvantage-academy.github.io/sample-customer-api/?spec=03-hypermedia-hal) · [YAML](../../blob/03-hypermedia-hal/openapi.yaml) | [PR #4](https://github.com/atvantage-academy/sample-customer-api/pull/4) |
 | [`04-autorisierung`](https://atvantage-academy.github.io/sample-customer-api/?spec=04-autorisierung) | OAuth 2, Scopes, `401` und `403` | [Swagger UI](https://atvantage-academy.github.io/sample-customer-api/?spec=04-autorisierung) · [YAML](../../blob/04-autorisierung/openapi.yaml) | [PR #5](https://github.com/atvantage-academy/sample-customer-api/pull/5) |
