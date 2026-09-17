@@ -3,17 +3,17 @@
 # entstanden ist, liegt unter docs/design.md – dort stehen auch die
 # Alternativen, die im Kurs zur Diskussion standen.
 #
-# DIES IST DER STAND `02-problem-details`: `01-paginierung` plus ein
-# standardisiertes Fehlerformat nach RFC 9457. Was genau anders ist, zeigt
-# `git diff 01-paginierung..02-problem-details -- openapi.yaml`.
+# DIES IST DER STAND `03-hypermedia-hal`: `02-problem-details` plus HAL.
+# Die Antwort trägt ihre nächsten Schritte als `_links` mit - und zwar
+# ZUSTANDSABHÄNGIG. Diff: `git diff 02-problem-details..03-hypermedia-hal`.
 openapi: 3.1.0
 
 info:
   title: Account Service API
   # Beschriftung und Kurztext fuer das Auswahlfeld der Swagger UI.
   # Jeder Stand benennt sich hier selbst - die Pipeline liest beides aus.
-  x-stand-label: '02 · Problem Details'
-  summary: Fehler nach RFC 9457 – ein Standardformat statt eines selbst erfundenen.
+  x-stand-label: '03 · Hypermedia (HAL)'
+  summary: Die Antwort trägt mit, was als Nächstes möglich ist – zustandsabhängig.
   description: |
     Verwaltung der Kundenkonten eines Online-Shops.
 
@@ -23,15 +23,25 @@ info:
     vertretbar; die Begründungen stehen im
     [formlosen Entwurf](https://github.com/atvantage-academy/sample-customer-api/blob/main/docs/design.md).
 
-    ### Dies ist der Stand `02-problem-details`
+    ### Dies ist der Stand `03-hypermedia-hal`
 
-    Er baut auf `01-paginierung` auf und tauscht **eine** Sache aus: Das selbst
-    erfundene Fehlerobjekt weicht dem Standard **RFC 9457** (*Problem Details
-    for HTTP APIs*), Medientyp `application/problem+json`.
+    Er baut auf `02-problem-details` auf und ergänzt **HAL** (*Hypertext
+    Application Language*, Medientyp `application/hal+json`): Die Antwort trägt
+    unter `_links` mit, was von hier aus möglich ist.
 
-    **Das auswertbare Feld ist `type`** – eine URI, die den Fehler benennt.
-    Darauf darf ein Programm Logik bauen. `title` und `detail` sind für Menschen
-    und dürfen sich jederzeit ändern, ohne dass jemand bricht.
+    **Der eigentliche Punkt ist die Zustandsabhängigkeit.** Ein aktives Konto
+    bekommt `deactivate` und `lock`, ein deaktiviertes `activate` und `lock`, ein
+    gesperrtes nur `unlock`. Der Client muss die Regel „wer darf wann was“ nicht
+    kennen – er liest sie aus der Antwort.
+
+    **Und die Grenze von HAL gleich dazu:** Ein HAL-Link kennt `href`, aber
+    **keine Methode**. Dass `deactivate` ein `PUT` ist und `activate` ein
+    `DELETE` auf dieselbe Adresse, steht in dieser Beschreibung – nicht in der
+    Antwort. Wer das mitliefern will, braucht HAL-FORMS, Siren oder JSON:API.
+
+    Die alten Darstellungen bleiben: Wer `application/json` anfordert, bekommt
+    weiterhin die Antwort aus `02-problem-details`. **Hypermedia kommt über
+    Content Negotiation dazu, nicht als Bruch.**
 
     Oben links lässt sich zwischen den Ständen umschalten:
 
@@ -39,7 +49,7 @@ info:
     | ----- | ------------- |
     | `main` | Der Kern: Ressourcen, Methoden, Statuscodes, Schemas |
     | `01-paginierung` | Cursorbasiertes Blättern über die Kundenliste |
-    | `03-hypermedia-hal` | HAL: die Antwort trägt ihre nächsten Schritte mit |
+    | `02-problem-details` | Fehlerformat nach RFC 9457 statt eines eigenen |
     | `04-autorisierung` | OAuth 2, Scopes, `401` und `403` |
 
     Hinter den Adressen steht **kein Server** – dies ist ein Entwurf, keine
@@ -121,6 +131,13 @@ paths:
         '200':
           description: Die Seite wurde gelesen
           content:
+            # HAL ZUERST, und das ist Absicht: Swagger UI zeigt den ersten
+            # Medientyp. Dieser Stand handelt von Hypermedia - die `_links`
+            # sollen sichtbar sein, ohne dass jemand erst umschaltet. Die
+            # gewohnte Darstellung ist einen Klick entfernt, nicht weg.
+            application/hal+json:
+              schema:
+                $ref: '#/components/schemas/HalCustomerCollection'
             application/json:
               schema:
                 $ref: '#/components/schemas/CustomerList'
@@ -159,6 +176,9 @@ paths:
                 format: uri-reference
                 examples: ['/customers/3fa85f64-5717-4562-b3fc-2c963f66afa6']
           content:
+            application/hal+json:
+              schema:
+                $ref: '#/components/schemas/HalCustomer'
             application/json:
               schema:
                 $ref: '#/components/schemas/Customer'
@@ -178,6 +198,9 @@ paths:
         '200':
           description: Der Kunde wurde gefunden
           content:
+            application/hal+json:
+              schema:
+                $ref: '#/components/schemas/HalCustomer'
             application/json:
               schema:
                 $ref: '#/components/schemas/Customer'
@@ -205,6 +228,9 @@ paths:
         '200':
           description: Der Kunde wurde ersetzt
           content:
+            application/hal+json:
+              schema:
+                $ref: '#/components/schemas/HalCustomer'
             application/json:
               schema:
                 $ref: '#/components/schemas/Customer'
@@ -692,6 +718,192 @@ components:
             eine zweite, teure Abfrage, und sie stimmt ohnehin nur für einen
             Augenblick. Wer sie braucht, soll sie anfordern müssen.
           examples: ['eyJhZnRlciI6IjNmYTg1ZjY0In0', null]
+
+    Link:
+      type: object
+      description: |
+        Ein Verweis nach **HAL** (RFC-Entwurf *JSON Hypertext Application
+        Language*). Mehr als eine Adresse ist das nicht – **insbesondere keine
+        Methode.** Was mit dem Verweis zu tun ist, sagt die Beziehung, unter der
+        er steht, und diese Beschreibung hier.
+      required: [href]
+      properties:
+        href:
+          type: string
+          format: uri-reference
+          examples: ['/customers/3fa85f64-5717-4562-b3fc-2c963f66afa6']
+        title:
+          type: string
+          description: Beschriftung für Menschen – etwa für einen Knopf
+          examples: ['Konto deaktivieren']
+
+    CustomerLinks:
+      type: object
+      description: |
+        Was von diesem Kunden aus möglich ist. **Die Auswahl hängt vom Zustand
+        ab** – und genau das ist der Gewinn: Der Client muss die Regel nicht
+        kennen, er liest sie ab.
+
+        | `state` | vorhandene Beziehungen |
+        | ------- | ---------------------- |
+        | `aktiv` | `self`, `address`, `payments`, `deactivate`, `lock` |
+        | `deaktiviert` | `self`, `address`, `payments`, `activate`, `lock` |
+        | `gesperrt` | `self`, `address`, `payments`, `unlock` |
+
+        Ein gesperrtes Konto lässt sich **nicht** deaktivieren, deshalb fehlt der
+        Verweis. Ein deaktiviertes lässt sich sehr wohl sperren, deshalb ist
+        `lock` dort vorhanden.
+
+        **Und die Methode?** Steht nicht im Link. `deactivate` und `activate`
+        zeigen auf **dieselbe Adresse** – der eine meint `PUT`, der andere
+        `DELETE`. HAL kann das nicht ausdrücken; die Bedeutung steckt allein im
+        Namen der Beziehung. Wer die Methode mitliefern will, braucht ein
+        reicheres Format (HAL-FORMS, Siren, JSON:API).
+
+        Dass diese Aufstellung in Prosa steht und nicht im Schema, ist ebenfalls
+        eine Grenze: OpenAPI kann „dieses Feld gibt es nur, wenn `state` gleich
+        `aktiv` ist“ nicht ausdrücken, ohne das Schema in drei Varianten zu
+        zerlegen.
+      required: [self]
+      properties:
+        self:
+          allOf:
+            - $ref: '#/components/schemas/Link'
+          description: Dieser Kunde
+        address:
+          allOf:
+            - $ref: '#/components/schemas/Link'
+          description: Die Anschrift – `GET` und `PUT`
+        payments:
+          allOf:
+            - $ref: '#/components/schemas/Link'
+          description: Die Bezahldaten – `GET`
+        deactivate:
+          allOf:
+            - $ref: '#/components/schemas/Link'
+          description: |
+            Nur bei `aktiv`. **`PUT`** auf `/customers/{id}/flags/deactivation`.
+        activate:
+          allOf:
+            - $ref: '#/components/schemas/Link'
+          description: |
+            Nur bei `deaktiviert`. **`DELETE`** auf dieselbe Adresse wie
+            `deactivate`.
+        lock:
+          allOf:
+            - $ref: '#/components/schemas/Link'
+          description: |
+            Bei `aktiv` und bei `deaktiviert`. **`PUT`** auf
+            `/customers/{id}/flags/lock`.
+        unlock:
+          allOf:
+            - $ref: '#/components/schemas/Link'
+          description: |
+            Nur bei `gesperrt`. **`DELETE`** auf dieselbe Adresse wie `lock`.
+
+    HalCustomer:
+      description: |
+        Derselbe Kunde wie unter `application/json`, ergänzt um `_links`.
+        Angefordert wird er über den Medientyp – die alte Darstellung bleibt
+        unverändert bestehen.
+      allOf:
+        - $ref: '#/components/schemas/Customer'
+        - type: object
+          required: [_links]
+          properties:
+            _links:
+              allOf:
+                - $ref: '#/components/schemas/CustomerLinks'
+              readOnly: true
+      examples:
+        - id: '3fa85f64-5717-4562-b3fc-2c963f66afa6'
+          name: 'Tom Mayer'
+          birthdate: '1985-07-14'
+          state: 'aktiv'
+          _links:
+            self: { href: '/customers/3fa85f64-5717-4562-b3fc-2c963f66afa6' }
+            address: { href: '/customers/3fa85f64-5717-4562-b3fc-2c963f66afa6/address' }
+            payments: { href: '/customers/3fa85f64-5717-4562-b3fc-2c963f66afa6/payments' }
+            deactivate:
+              href: '/customers/3fa85f64-5717-4562-b3fc-2c963f66afa6/flags/deactivation'
+              title: 'Konto deaktivieren'
+            lock:
+              href: '/customers/3fa85f64-5717-4562-b3fc-2c963f66afa6/flags/lock'
+              title: 'Konto sperren'
+        - id: '9c1f2b0a-1111-4562-b3fc-2c963f66afa6'
+          name: 'Mia Wolf'
+          birthdate: '1990-02-03'
+          state: 'deaktiviert'
+          _links:
+            self: { href: '/customers/9c1f2b0a-1111-4562-b3fc-2c963f66afa6' }
+            address: { href: '/customers/9c1f2b0a-1111-4562-b3fc-2c963f66afa6/address' }
+            payments: { href: '/customers/9c1f2b0a-1111-4562-b3fc-2c963f66afa6/payments' }
+            activate:
+              href: '/customers/9c1f2b0a-1111-4562-b3fc-2c963f66afa6/flags/deactivation'
+              title: 'Konto wieder aktivieren'
+            lock:
+              href: '/customers/9c1f2b0a-1111-4562-b3fc-2c963f66afa6/flags/lock'
+              title: 'Konto sperren'
+        - id: '5e7d3c99-2222-4562-b3fc-2c963f66afa6'
+          name: 'Jan Krause'
+          birthdate: '1978-11-30'
+          state: 'gesperrt'
+          _links:
+            self: { href: '/customers/5e7d3c99-2222-4562-b3fc-2c963f66afa6' }
+            address: { href: '/customers/5e7d3c99-2222-4562-b3fc-2c963f66afa6/address' }
+            payments: { href: '/customers/5e7d3c99-2222-4562-b3fc-2c963f66afa6/payments' }
+            unlock:
+              href: '/customers/5e7d3c99-2222-4562-b3fc-2c963f66afa6/flags/lock'
+              title: 'Sperre aufheben'
+
+    HalCustomerCollection:
+      type: object
+      description: |
+        Die Kundenliste als HAL-Dokument. Die Einträge stehen unter
+        `_embedded.customers`, nicht unter `items` – so schreibt es HAL vor.
+
+        **Der `next`-Verweis ist der unauffälligste Hypermedia-Gewinn und der
+        nützlichste:** Statt den Cursor selbst an die Adresse zu hängen, folgt
+        der Client einfach dem Link. Fehlt er, ist die Liste zu Ende. Genau das
+        bauen viele APIs ganz selbstverständlich ein, ohne es Hypermedia zu
+        nennen.
+      required: [_links, _embedded]
+      properties:
+        _links:
+          type: object
+          required: [self]
+          properties:
+            self:
+              $ref: '#/components/schemas/Link'
+            next:
+              allOf:
+                - $ref: '#/components/schemas/Link'
+              description: |
+                Die nächste Seite, Cursor bereits eingebaut. **Fehlt dieser
+                Verweis, war es die letzte Seite** – der Client braucht
+                `nextCursor` nicht mehr auszuwerten.
+        _embedded:
+          type: object
+          required: [customers]
+          properties:
+            customers:
+              type: array
+              items:
+                $ref: '#/components/schemas/HalCustomer'
+      examples:
+        - _links:
+            self: { href: '/customers?limit=50' }
+            next: { href: '/customers?limit=50&cursor=eyJhZnRlciI6IjkxYzAxZjIzIn0' }
+          _embedded:
+            customers:
+              - id: '3fa85f64-5717-4562-b3fc-2c963f66afa6'
+                name: 'Tom Mayer'
+                birthdate: '1985-07-14'
+                state: 'aktiv'
+                _links:
+                  self: { href: '/customers/3fa85f64-5717-4562-b3fc-2c963f66afa6' }
+                  deactivate: { href: '/customers/3fa85f64-5717-4562-b3fc-2c963f66afa6/flags/deactivation' }
+                  lock: { href: '/customers/3fa85f64-5717-4562-b3fc-2c963f66afa6/flags/lock' }
 
     Address:
       type: object
