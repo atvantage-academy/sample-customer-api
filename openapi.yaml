@@ -3,17 +3,17 @@
 # entstanden ist, liegt unter docs/design.md – dort stehen auch die
 # Alternativen, die im Kurs zur Diskussion standen.
 #
-# DIES IST DER STAND `01-paginierung`: der Kern aus `main` plus
-# cursorbasiertes Blättern über die Kundenliste. Was genau dazugekommen
-# ist, zeigt `git diff main..01-paginierung -- openapi.yaml`.
+# DIES IST DER STAND `02-problem-details`: `01-paginierung` plus ein
+# standardisiertes Fehlerformat nach RFC 9457. Was genau anders ist, zeigt
+# `git diff 01-paginierung..02-problem-details -- openapi.yaml`.
 openapi: 3.1.0
 
 info:
   title: Account Service API
   # Beschriftung und Kurztext fuer das Auswahlfeld der Swagger UI.
   # Jeder Stand benennt sich hier selbst - die Pipeline liest beides aus.
-  x-stand-label: '01 · Paginierung'
-  summary: Cursorbasiertes Blättern über die Kundenliste – ohne Seitennummern.
+  x-stand-label: '02 · Problem Details'
+  summary: Fehler nach RFC 9457 – ein Standardformat statt eines selbst erfundenen.
   description: |
     Verwaltung der Kundenkonten eines Online-Shops.
 
@@ -23,23 +23,22 @@ info:
     vertretbar; die Begründungen stehen im
     [formlosen Entwurf](https://github.com/atvantage-academy/sample-customer-api/blob/main/docs/design.md).
 
-    ### Dies ist der Stand `01-paginierung`
+    ### Dies ist der Stand `02-problem-details`
 
-    Er baut auf `main` auf und ergänzt **eine** Sache: Die Kundenliste wird
-    cursorbasiert geblättert. `GET /customers` bekommt `cursor` und `limit`,
-    die Antwort einen `nextCursor`. Sonst ist nichts anders.
+    Er baut auf `01-paginierung` auf und tauscht **eine** Sache aus: Das selbst
+    erfundene Fehlerobjekt weicht dem Standard **RFC 9457** (*Problem Details
+    for HTTP APIs*), Medientyp `application/problem+json`.
 
-    **Warum kein `page`-Parameter?** Weil seitenbasiertes Blättern Einträge
-    doppelt liefert oder verschluckt, sobald sich der Bestand zwischendurch
-    ändert – und das tut er immer. Die Begründung steht ausführlich im
-    [formlosen Entwurf](https://github.com/atvantage-academy/sample-customer-api/blob/01-paginierung/docs/design.md#eine-million-kunden).
+    **Das auswertbare Feld ist `type`** – eine URI, die den Fehler benennt.
+    Darauf darf ein Programm Logik bauen. `title` und `detail` sind für Menschen
+    und dürfen sich jederzeit ändern, ohne dass jemand bricht.
 
     Oben links lässt sich zwischen den Ständen umschalten:
 
     | Stand | Was dazukommt |
     | ----- | ------------- |
     | `main` | Der Kern: Ressourcen, Methoden, Statuscodes, Schemas |
-    | `02-problem-details` | Fehlerformat nach RFC 9457 statt eines eigenen |
+    | `01-paginierung` | Cursorbasiertes Blättern über die Kundenliste |
     | `03-hypermedia-hal` | HAL: die Antwort trägt ihre nächsten Schritte mit |
     | `04-autorisierung` | OAuth 2, Scopes, `401` und `403` |
 
@@ -131,9 +130,9 @@ paths:
             ein `cursor`, der nicht mehr gilt. Ein Zeiger kann **ablaufen**; der
             Aufrufer beginnt dann von vorn.
           content:
-            application/json:
+            application/problem+json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/ValidationProblem'
 
     post:
       tags: [customers]
@@ -273,9 +272,9 @@ paths:
         '404':
           description: Kunde unbekannt oder ohne hinterlegte Anschrift
           content:
-            application/json:
+            application/problem+json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/Problem'
 
     put:
       tags: [address]
@@ -340,9 +339,9 @@ paths:
         '404':
           description: Kunde unbekannt oder ohne PayPal-Daten
           content:
-            application/json:
+            application/problem+json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/Problem'
     put:
       tags: [payments]
       operationId: replacePayPal
@@ -397,9 +396,9 @@ paths:
         '404':
           description: Kunde unbekannt oder ohne Kreditkartendaten
           content:
-            application/json:
+            application/problem+json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/Problem'
     put:
       tags: [payments]
       operationId: replaceCreditCard
@@ -461,9 +460,9 @@ paths:
         '404':
           description: Kunde unbekannt, oder der Schalter ist nicht gesetzt
           content:
-            application/json:
+            application/problem+json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/Problem'
     put:
       tags: [flags]
       operationId: setDeactivationFlag
@@ -488,9 +487,9 @@ paths:
             Das Konto ist **gesperrt**. Eine Sperre ist stärker als eine
             Deaktivierung und lässt sich nicht von ihr überschreiben.
           content:
-            application/json:
+            application/problem+json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/Problem'
     delete:
       tags: [flags]
       operationId: clearDeactivationFlag
@@ -532,9 +531,9 @@ paths:
         '404':
           description: Kunde unbekannt, oder der Schalter ist nicht gesetzt
           content:
-            application/json:
+            application/problem+json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/Problem'
     put:
       tags: [flags]
       operationId: setLockFlag
@@ -608,15 +607,15 @@ components:
     BadRequest:
       description: Die Anfrage ist nicht gültig
       content:
-        application/json:
+        application/problem+json:
           schema:
-            $ref: '#/components/schemas/Error'
+            $ref: '#/components/schemas/ValidationProblem'
     NotFound:
       description: Diese Ressource gibt es nicht
       content:
-        application/json:
+        application/problem+json:
           schema:
-            $ref: '#/components/schemas/Error'
+            $ref: '#/components/schemas/Problem'
 
   schemas:
 
@@ -776,29 +775,69 @@ components:
           format: date-time
           readOnly: true
 
-    Error:
+    Problem:
       type: object
       description: |
-        Das Fehlerformat dieser API – **selbst erfunden**, und genau das ist
-        der Punkt: Es tut, was es soll, aber jeder Client muss es neu lernen.
-        Der Stand `02-problem-details` ersetzt es durch den Standard RFC 9457.
-      required: [message]
+        Fehlerformat nach **RFC 9457** (*Problem Details for HTTP APIs*),
+        Medientyp `application/problem+json`.
+
+        Der Gewinn gegenüber einem eigenen Format: Ein Client, der schon einmal
+        eine Problem-Details-Antwort verarbeitet hat, versteht auch diese. Und
+        Werkzeuge – Gateways, Bibliotheken, Logging – kennen sie ohnehin.
+
+        Was **nicht** hineingehört: Stacktraces, Klassennamen, SQL-Fragmente,
+        Pfade. Eine Fehlerantwort geht nach außen.
       properties:
-        message:
+        type:
           type: string
-          description: Was schiefgegangen ist, für Menschen lesbar
-          examples: ['Die Kundendaten sind nicht gültig.']
-        fields:
-          type: array
+          format: uri
           description: |
-            Bei Validierungsfehlern **alle** beanstandeten Felder auf einmal –
-            sonst braucht der Aufrufer mehrere Anläufe.
-          items:
-            type: object
-            properties:
-              field:
-                type: string
-                examples: ['name']
-              message:
-                type: string
-                examples: ['mindestens 3 Zeichen']
+            Die Fehlerkennung – **das einzige Feld, auf das ein Programm Logik
+            bauen darf.** Eine URI, keine Zahl: Sie ist eindeutig, auch wenn
+            zwei Dienste denselben Statuscode benutzen.
+          default: 'about:blank'
+          examples: ['https://api.example.com/problems/validation-error']
+        title:
+          type: string
+          description: Kurze Beschreibung für Menschen; darf sich ändern.
+          examples: ['Die Kundendaten sind nicht gültig']
+        status:
+          type: integer
+          description: |
+            Derselbe Code wie in der Statuszeile. Redundant, und trotzdem
+            nützlich: Er bleibt erhalten, wenn die Antwort weitergereicht oder
+            protokolliert wird.
+          examples: [400]
+        detail:
+          type: string
+          description: Beschreibung dieses konkreten Falls; darf sich ändern.
+          examples: ['2 Felder sind fehlerhaft.']
+        instance:
+          type: string
+          format: uri-reference
+          description: Worauf sich der Fehler bezieht
+          examples: ['/customers/3fa85f64-5717-4562-b3fc-2c963f66afa6']
+
+    ValidationProblem:
+      description: |
+        Ein Problem Details mit einem **eigenen Feld**. Genau dafür ist RFC 9457
+        gebaut: Das Format ist erweiterbar, ohne dass es aufhört, Standard zu
+        sein – wer `errors` nicht kennt, liest trotzdem `type` und `title`.
+      allOf:
+        - $ref: '#/components/schemas/Problem'
+        - type: object
+          properties:
+            errors:
+              type: array
+              description: |
+                **Alle** fehlerhaften Felder auf einmal – sonst braucht der
+                Aufrufer mehrere Anläufe.
+              items:
+                type: object
+                properties:
+                  field:
+                    type: string
+                    examples: ['name']
+                  message:
+                    type: string
+                    examples: ['mindestens 3 Zeichen']
