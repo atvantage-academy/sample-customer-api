@@ -1,7 +1,7 @@
 # Regeln fuer `redocly lint openapi.yaml` (laeuft in der Pages-Pipeline).
 #
-# Grundlage ist das empfohlene Regelwerk. Zwei Regeln sind bewusst
-# ABGESCHALTET - beide beanstanden etwas, das hier Absicht ist:
+# Grundlage ist das empfohlene Regelwerk. Drei Regeln sind bewusst
+# ABGESCHALTET - alle drei beanstanden etwas, das hier Absicht ist:
 extends:
   - recommended
 
@@ -16,3 +16,9 @@ rules:
   # ebenfalls keine. Wird die Lizenzfrage org-weit entschieden, gehoert die
   # Angabe nach `info.license` - und diese Zeile hier verschwindet.
   info-license: off
+
+  # Keine Security im Stand `main`: Autorisierung ist im Kurs ein eigenes
+  # Thema und liegt deshalb im Stand `04-autorisierung`. Dort ist diese
+  # Regel wieder eingeschaltet - der Branch bringt seine eigene redocly.yaml
+  # mit. Wer `main` um Security ergaenzt, loescht diese Zeile.
+  security-defined: off

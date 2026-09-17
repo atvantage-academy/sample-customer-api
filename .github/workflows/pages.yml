@@ -1,8 +1,10 @@
 # =============================================================================
-# Swagger UI fuer openapi.yaml -> GitHub Pages
+# Swagger UI fuer ALLE Staende -> GitHub Pages
 # -----------------------------------------------------------------------------
-# Die Swagger UI wird bei jedem Lauf frisch aus dem npm-Paket swagger-ui-dist
-# geholt und zusammen mit openapi.yaml als statische Site veroeffentlicht.
+# Die Musterloesung liegt in mehreren Staenden: `main` traegt den Kern, die
+# Branches `01-…` bis `04-…` je ein weiterfuehrendes Thema. Dieser Workflow
+# sammelt aus jedem Branch die `openapi.yaml` ein und veroeffentlicht sie
+# zusammen mit EINER Swagger UI, in der oben links umgeschaltet wird.
 #
 # BEWUSST NICHT IM REPOSITORY: Frueher lag die entpackte Swagger UI als rund
 # 20 Dateien im Repo (eigener Branch). Das hatte drei Nachteile - die Fassung
@@ -11,6 +13,10 @@
 # wird. Hier steht sie als PIN in einer Zeile (SWAGGER_UI_VERSION) und wird zur
 # Build-Zeit geladen.
 #
+# DIE OBERFLAECHE steht dagegen als richtige Datei im Repo, unter `web/`. Sie
+# laesst sich dadurch lokal ansehen und in einem Diff lesen - anders als frueher,
+# als die index.html in einem Here-Dokument in dieser Datei stand.
+#
 # Voraussetzung (einmalig): Settings -> Pages -> Source: "GitHub Actions".
 # =============================================================================
 name: Swagger UI
@@ -18,9 +24,13 @@ name: Swagger UI
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
   workflow_dispatch:
+  # Ein Stand wurde geaendert: `OpenAPI pruefen` ist dort durchgelaufen, und
+  # dieser Lauf haengt sich daran. Er laeuft im Kontext des Standard-Branches
+  # und darf deshalb veroeffentlichen (siehe Kommentar in spec-check.yml).
+  workflow_run:
+    workflows: ["OpenAPI pruefen"]
+    types: [completed]
 
 permissions:
   contents: read
@@ -35,102 +45,128 @@ concurrency:
 
 env:
   SWAGGER_UI_VERSION: 5.32.15
+  # Welche Branches ein Stand sind. `main` und zweistellig nummerierte
+  # Branches - alles andere (Feature-Branches, Experimente) bleibt draussen.
+  STAND_PATTERN: '^(main|[0-9]{2}-[a-z0-9-]+)$'
 
 jobs:
 
   build:
+    # Bei `workflow_run` nur weitermachen, wenn die Pruefung sauber war UND auf
+    # einem Stand lief. `main` ist ausgenommen, weil dort schon der Push-Ausloeser
+    # baut; Feature-Branches sind ausgenommen, weil sie am Ergebnis nichts aendern
+    # wuerden - veroeffentlicht werden nur `main` und die nummerierten Staende.
+    # Ausdruecke koennen hier kein Muster pruefen, deshalb das schlichte `0` am
+    # Anfang: Es trifft 01 bis 09 und sonst nichts.
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       startsWith(github.event.workflow_run.head_branch, '0'))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Vollstaendig, weil die uebrigen Staende aus den anderen Branches
+          # gelesen werden. Ohne das gibt es nur den einen Checkout.
+          fetch-depth: 0
 
-      - name: OpenAPI-Dokument pruefen
-        run: npx --yes @redocly/cli@1 lint openapi.yaml --format stylish
+      - name: Redocly bereitstellen
+        run: npm install --global @redocly/cli@1
+
+      - name: Staende einsammeln und pruefen
+        run: |
+          set -euo pipefail
+          mkdir -p site/specs
+          : > entries.ndjson
+
+          # Alle Branches, die dem Muster entsprechen: `main` zuerst, danach die
+          # nummerierten aufsteigend - das ist die Reihenfolge, in der der Kurs
+          # sie aufbaut, und die Reihenfolge im Auswahlfeld.
+          all=$(git for-each-ref --format='%(refname:short)' refs/remotes/origin \
+                | sed 's|^origin/||' | grep -Ev '^HEAD$' | sort -u)
+          staende=$( { echo "$all" | grep -Ex 'main' || true; \
+                       echo "$all" | grep -Ex '[0-9]{2}-[a-z0-9-]+' | sort || true; } )
+
+          echo "Gefundene Staende:"; echo "$staende" | sed 's/^/  - /'
+
+          for branch in $staende; do
+            if ! git cat-file -e "origin/$branch:openapi.yaml" 2>/dev/null; then
+              echo "::warning::Branch $branch hat keine openapi.yaml - uebersprungen."
+              continue
+            fi
+
+            echo "::group::Stand $branch"
+            # In ein eigenes Verzeichnis auspacken, damit der Checkout unberuehrt
+            # bleibt - und damit `redocly` die redocly.yaml DIESES Standes sieht.
+            mkdir -p "work/$branch"
+            git archive "origin/$branch" | tar -x -C "work/$branch"
+
+            ( cd "work/$branch" && redocly lint openapi.yaml --format stylish )
+
+            # Fuer die Beschriftung im Auswahlfeld: Jeder Stand benennt sich
+            # selbst in `info.x-stand-label` und `info.summary`. Gebuendelt wird
+            # nur, um die beiden Felder zuverlaessig auslesen zu koennen - im
+            # Netz landet die YAML-Fassung, die man auch lesen will.
+            redocly bundle "work/$branch/openapi.yaml" \
+              --output "work/$branch/bundle.json" --ext json > /dev/null
+
+            label=$(jq -r '.info["x-stand-label"] // empty' "work/$branch/bundle.json")
+            summary=$(jq -r '.info.summary // empty' "work/$branch/bundle.json")
+
+            mkdir -p "site/specs/$branch"
+            cp "work/$branch/openapi.yaml" "site/specs/$branch/openapi.yaml"
+
+            jq -nc \
+              --arg branch  "$branch" \
+              --arg label   "${label:-$branch}" \
+              --arg summary "$summary" \
+              --arg url     "specs/$branch/openapi.yaml" \
+              '{branch:$branch,label:$label,summary:$summary,url:$url}' >> entries.ndjson
+            echo "::endgroup::"
+          done
+
+          jq -s --arg repo "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" \
+            '{repository:$repo, specs:.}' entries.ndjson > site/specs.json
+          cat site/specs.json
 
       - name: Swagger UI holen und Site zusammenstellen
         run: |
           set -euo pipefail
-          mkdir -p site
           npm pack --silent --pack-destination /tmp "swagger-ui-dist@${SWAGGER_UI_VERSION}" > /tmp/tgz.txt
           tar -xzf "/tmp/$(cat /tmp/tgz.txt)" -C /tmp
           # swagger-ui-standalone-preset.js wird NICHT kopiert: Es liefert
-          # ausschliesslich die Topbar (SmartBear-Logo + Eingabefeld fuer eine
-          # beliebige andere Beschreibung). Die Seite nutzt BaseLayout, damit
-          # entfaellt die Leiste - und rund 300 KB Uebertragung dazu.
+          # ausschliesslich die mitgelieferte Topbar (SmartBear-Logo + Eingabefeld
+          # fuer eine beliebige andere Beschreibung). Unsere Leiste steht in
+          # web/ - und spart rund 300 KB Uebertragung.
+          # Die Favicons von swagger-ui-dist ebenfalls nicht: Das ist eine
+          # fremde Marke. web/favicon.svg tritt an ihre Stelle.
           cp /tmp/package/swagger-ui.css \
              /tmp/package/swagger-ui-bundle.js \
-             /tmp/package/favicon-16x16.png \
-             /tmp/package/favicon-32x32.png \
              /tmp/package/oauth2-redirect.html \
              site/
-          cp openapi.yaml site/
-          cp -r docs site/docs
+          cp web/index.html web/topbar.css web/topbar.js \
+             web/logo-atvantage.svg web/favicon.svg site/
           cp README.md site/
-
-      - name: Startseite erzeugen
-        run: |
-          # Bewusst KEIN eigener Kopf, kein Hinweisbanner: Die Einordnung
-          # ("Musterloesung, nicht die einzige Loesung") und die Verweise auf
-          # Entwurf und Repository stehen in `info.description` des
-          # OpenAPI-Dokuments. Swagger UI rendert sie dort im eigenen Layout.
-          # Ein zusaetzliches Band darueber waere eine zweite Wahrheit - und
-          # saehe aus wie ein Zettel, den jemand an die Seite geklebt hat.
-          cat > site/index.html <<'HTML'
-          <!DOCTYPE html>
-          <html lang="de">
-          <head>
-            <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1">
-            <title>Account Service API – Musterlösung der ATVANTAGE Academy</title>
-            <meta name="description" content="Musterlösung zur Entwurfsübung aus dem Training „REST APIs – Grundlagen und Design“.">
-            <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
-            <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
-            <link rel="stylesheet" href="swagger-ui.css">
-            <style>
-              html { color-scheme: light; }
-              body { margin: 0; background: #fafafa; }
-            </style>
-          </head>
-          <body>
-            <div id="swagger-ui"></div>
-            <script src="swagger-ui-bundle.js" crossorigin></script>
-            <script>
-              window.ui = SwaggerUIBundle({
-                url: "openapi.yaml",
-                dom_id: "#swagger-ui",
-                deepLinking: true,
-                docExpansion: "list",
-                defaultModelsExpandDepth: 1,
-                tryItOutEnabled: false,
-                supportedSubmitMethods: [],
-                presets: [SwaggerUIBundle.presets.apis],
-                plugins: [SwaggerUIBundle.plugins.DownloadUrl],
-                // BaseLayout statt StandaloneLayout: Damit entfaellt die schwarze
-                // Topbar mit dem SmartBear-Logo und dem Eingabefeld, ueber das
-                // sich eine beliebige andere Beschreibung laden liesse. Beides
-                // gehoert nicht auf eine Schulungsunterlage. Servers-Auswahl,
-                // Authorize und die Info-Sektion bleiben erhalten.
-                layout: "BaseLayout"
-              });
-            </script>
-          </body>
-          </html>
-          HTML
+          cp -r docs site/docs
 
       - name: Ergebnis pruefen
         run: |
           set -euo pipefail
-          test -s site/index.html      || { echo "FEHLER: index.html fehlt oder ist leer"; exit 1; }
-          test -s site/openapi.yaml    || { echo "FEHLER: openapi.yaml fehlt";            exit 1; }
-          test -s site/swagger-ui.css  || { echo "FEHLER: Swagger UI fehlt";              exit 1; }
-          echo "Site: $(find site -type f | wc -l) Dateien"
+          test -s site/index.html     || { echo "FEHLER: index.html fehlt oder ist leer"; exit 1; }
+          test -s site/topbar.js      || { echo "FEHLER: topbar.js fehlt";                exit 1; }
+          test -s site/swagger-ui.css || { echo "FEHLER: Swagger UI fehlt";               exit 1; }
+          test -s site/specs.json     || { echo "FEHLER: specs.json fehlt";               exit 1; }
+          anzahl=$(jq '.specs | length' site/specs.json)
+          test "$anzahl" -ge 1 || { echo "FEHLER: kein einziger Stand gefunden"; exit 1; }
+          jq -e '.specs[] | select(.branch == "main")' site/specs.json > /dev/null \
+            || { echo "FEHLER: der Stand main fehlt"; exit 1; }
+          echo "Site: $(find site -type f | wc -l) Dateien, $anzahl Staende"
 
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
 
   deploy:
-    # Nur bei Push auf main. Ein Pull Request baut, veroeffentlicht aber nicht.
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: build
     runs-on: ubuntu-latest
     environment:
