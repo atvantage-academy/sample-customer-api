@@ -26,26 +26,55 @@
 .swagger-ui,
 .swagger-ui * { font-family: var(--avd-font) !important; }
 
-/* ... und alles, was Code IST, bleibt monospace. Eine Adresse, ein Feldname
-   oder ein JSON-Beispiel in Proportionalschrift ist schlechter lesbar, nicht
-   schoener. */
+/* ... und alles, was Code IST, bleibt monospace. Eine Adresse, ein JSON-Beispiel
+   oder eine Typangabe in Proportionalschrift ist schlechter lesbar, nicht
+   schoener.
+   DIESE LISTE IST NICHT FREI GEWAEHLT: Sie ist genau die Menge, die Swagger UI
+   selbst monospace setzt. Alles andere - Parametername, Statuscode-Spalte,
+   Schema-Ueberschrift - ist dort Proportionalschrift und bleibt es auch. Wer
+   hier Elemente ergaenzt, aendert die Darstellung von Swagger UI, statt sie nur
+   auf unsere Schrift zu bringen. */
 .swagger-ui .microlight,
 .swagger-ui .model,
-.swagger-ui .model-title,
 .swagger-ui .prop-type,
 .swagger-ui .prop-format,
-.swagger-ui .parameter__name,
 .swagger-ui .parameter__type,
 .swagger-ui .parameter__in,
+.swagger-ui .parameter__deprecated,
 .swagger-ui .opblock-summary-path,
 .swagger-ui .opblock-summary-path__deprecated,
 .swagger-ui .opblock-summary-operation-id,
-.swagger-ui .response-col_status,
 .swagger-ui .renderedMarkdown code,
 .swagger-ui .markdown code,
 .swagger-ui .markdown pre,
 .swagger-ui code,
 .swagger-ui pre { font-family: var(--avd-mono) !important; }
+
+/* --- Code im Fliesstext --------------------------------------------------- */
+
+/* Swagger UI setzt Code in Beschreibungen LILA (#9012fe) auf grauem Grund, fett
+   und in fester Groesse. Im Fliesstext springt jedes `main`, `401` und
+   `01-paginierung` damit heraus, als waere es wichtiger als der Satz drumherum -
+   und die Farbe gehoert zu keiner Marke, sondern ist die von Swagger UI fuer die
+   HTTP-Methode HEAD. Hier gilt stattdessen dasselbe wie in den Kursunterlagen:
+   Tonflaeche statt Farbe, Schriftgroesse relativ zur Zeile. */
+.swagger-ui .markdown code,
+.swagger-ui .renderedMarkdown code {
+  background: var(--avd-code-bg);
+  color: inherit;
+  font-size: .92em;
+  font-weight: 500;
+  padding: .1em .35em;
+  border-radius: 4px;
+}
+
+/* Im Codeblock waere die Tonflaeche doppelt - der Block hat schon eine. */
+.swagger-ui .markdown pre > code,
+.swagger-ui .renderedMarkdown pre > code {
+  background: none;
+  padding: 0;
+  font-size: inherit;
+}
 
 /* Outfit laeuft etwas schmaler als Titillium Web - die Ueberschriften vertragen
    deshalb ein wenig mehr Gewicht, damit die Hierarchie erhalten bleibt. */
