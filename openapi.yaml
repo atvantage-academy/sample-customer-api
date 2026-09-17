@@ -3,17 +3,17 @@
 # entstanden ist, liegt unter docs/design.md – dort stehen auch die
 # Alternativen, die im Kurs zur Diskussion standen.
 #
-# DIES IST DER STAND `main`: der Kern des Entwurfs, ohne Zusätze.
-# Paginierung, Problem Details, Hypermedia und Autorisierung liegen als
-# eigene Stände in den Branches 01 bis 04 – siehe README.md.
+# DIES IST DER STAND `01-paginierung`: der Kern aus `main` plus
+# cursorbasiertes Blättern über die Kundenliste. Was genau dazugekommen
+# ist, zeigt `git diff main..01-paginierung -- openapi.yaml`.
 openapi: 3.1.0
 
 info:
   title: Account Service API
   # Beschriftung und Kurztext fuer das Auswahlfeld der Swagger UI.
   # Jeder Stand benennt sich hier selbst - die Pipeline liest beides aus.
-  x-stand-label: 'main · Der Kern'
-  summary: Der Kern des Entwurfs – Ressourcen, Methoden, Statuscodes. Ohne Zusätze.
+  x-stand-label: '01 · Paginierung'
+  summary: Cursorbasiertes Blättern über die Kundenliste – ohne Seitennummern.
   description: |
     Verwaltung der Kundenkonten eines Online-Shops.
 
@@ -23,15 +23,22 @@ info:
     vertretbar; die Begründungen stehen im
     [formlosen Entwurf](https://github.com/atvantage-academy/sample-customer-api/blob/main/docs/design.md).
 
-    ### Dies ist der Stand `main`
+    ### Dies ist der Stand `01-paginierung`
 
-    Er enthält **den Kern**: Ressourcen, Methoden, Statuscodes, Schemas. Die
-    weiterführenden Themen des Kurses sind bewusst **nicht** hier, sondern in
-    eigenen Ständen – oben links umschaltbar:
+    Er baut auf `main` auf und ergänzt **eine** Sache: Die Kundenliste wird
+    cursorbasiert geblättert. `GET /customers` bekommt `cursor` und `limit`,
+    die Antwort einen `nextCursor`. Sonst ist nichts anders.
+
+    **Warum kein `page`-Parameter?** Weil seitenbasiertes Blättern Einträge
+    doppelt liefert oder verschluckt, sobald sich der Bestand zwischendurch
+    ändert – und das tut er immer. Die Begründung steht ausführlich im
+    [formlosen Entwurf](https://github.com/atvantage-academy/sample-customer-api/blob/01-paginierung/docs/design.md#eine-million-kunden).
+
+    Oben links lässt sich zwischen den Ständen umschalten:
 
     | Stand | Was dazukommt |
     | ----- | ------------- |
-    | `01-paginierung` | Cursorbasiertes Blättern über die Kundenliste |
+    | `main` | Der Kern: Ressourcen, Methoden, Statuscodes, Schemas |
     | `02-problem-details` | Fehlerformat nach RFC 9457 statt eines eigenen |
     | `03-hypermedia-hal` | HAL: die Antwort trägt ihre nächsten Schritte mit |
     | `04-autorisierung` | OAuth 2, Scopes, `401` und `403` |
@@ -71,27 +78,62 @@ paths:
       operationId: readCustomers
       summary: Alle Kunden lesen
       description: |
-        Liefert die Kunden. **Ohne Bezahldaten** – die liegen als eigene
-        Subressourcen, weil sie anders geschützt werden müssen.
+        Liefert die Kunden **seitenweise**, und zwar cursorbasiert: Der Client
+        fragt nicht nach „Seite 7“, sondern nach dem, was **hinter diesem
+        Zeiger** kommt. Ohne `cursor` beginnt die Liste von vorn.
 
-        Ohne Grenze ist diese Operation eine Zeitbombe: Bei einer Million
-        Kunden kippt sie Datenbank, Service, Gateway und Client der Reihe nach
-        um. Was daraus folgt, steht im Stand `01-paginierung`.
+        Es gibt **keine Antwort ohne Grenze**. Fehlt `limit`, gilt die Vorgabe;
+        über die Obergrenze kommt niemand hinaus. Das ist der eigentliche Punkt
+        der Paginierung – nicht die Bequemlichkeit, sondern der Schutz.
+
+        **Ohne Bezahldaten** – die liegen als eigene Subressourcen, weil sie
+        anders geschützt werden müssen.
       parameters:
         - name: state
           in: query
           description: Nur Kunden in diesem Zustand
           schema:
             $ref: '#/components/schemas/CustomerState'
+        - name: cursor
+          in: query
+          description: |
+            Der Zeiger auf die Fortsetzung – wörtlich das, was in `nextCursor`
+            der vorigen Antwort stand. Fehlt er, beginnt die Liste von vorn.
+
+            **Undurchsichtig, mit Absicht:** Wer ihn auseinandernimmt und daraus
+            eine Kennung oder einen Zeitstempel liest, baut auf etwas, das sich
+            jederzeit ändern darf. Er wird weitergereicht, nicht interpretiert.
+          schema:
+            type: string
+            maxLength: 512
+            examples: ['eyJhZnRlciI6IjNmYTg1ZjY0In0']
+        - name: limit
+          in: query
+          description: |
+            Wie viele Einträge höchstens zurückkommen. Die Antwort darf
+            **weniger** liefern, ohne dass die Liste zu Ende ist – ob es
+            weitergeht, sagt allein `nextCursor`.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
       responses:
         '200':
-          description: Die Kunden wurden gelesen
+          description: Die Seite wurde gelesen
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/CustomerList'
         '400':
-          $ref: '#/components/responses/BadRequest'
+          description: |
+            Ungültiger Parameter – etwa ein `limit` außerhalb der Grenzen oder
+            ein `cursor`, der nicht mehr gilt. Ein Zeiger kann **ablaufen**; der
+            Aufrufer beginnt dann von vorn.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
     post:
       tags: [customers]
@@ -630,15 +672,27 @@ components:
     CustomerList:
       type: object
       description: |
-        **Ein Objekt, kein nacktes Array.** Nur so lassen sich Gesamtzahl,
-        Seitenangaben oder Verweise später ergänzen, ohne Aufrufer zu brechen.
-        Genau das tun die Stände `01-paginierung` und `03-hypermedia-hal`.
-      required: [items]
+        **Ein Objekt, kein nacktes Array.** Genau deshalb war dieser Stand
+        möglich: `nextCursor` ist ein neues Feld in einem bestehenden Objekt –
+        kein einziger Aufrufer von `main` bricht daran. Wäre die Antwort ein
+        nacktes Array gewesen, hätte die Paginierung sie ersetzen müssen.
+      required: [items, nextCursor]
       properties:
         items:
           type: array
+          description: Die Kunden dieser Seite, in stabiler Reihenfolge
           items:
             $ref: '#/components/schemas/Customer'
+        nextCursor:
+          type: [string, 'null']
+          description: |
+            Der Zeiger auf die nächste Seite – als `cursor` in die nächste
+            Anfrage. **`null` heißt: Das war die letzte Seite.**
+
+            Bewusst **keine** Gesamtzahl daneben: Sie kostet bei großen Beständen
+            eine zweite, teure Abfrage, und sie stimmt ohnehin nur für einen
+            Augenblick. Wer sie braucht, soll sie anfordern müssen.
+          examples: ['eyJhZnRlciI6IjNmYTg1ZjY0In0', null]
 
     Address:
       type: object

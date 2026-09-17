@@ -7,9 +7,10 @@ später bzw. in einem eigenen Kurs.
 **Annahme durchgehend:** JSON ist das einzige Austauschformat. `Accept` und
 `Content-Type` sind deshalb unten nicht bei jeder Operation erwähnt.
 
-> **Dies ist der Stand `main` – der Kern.** Paginierung, Fehlerformat, Hypermedia
-> und Autorisierung stehen bewusst nicht hier, sondern in eigenen Ständen. Was sie
-> hinzufügen, steht unten unter [Weiterführende Stände](#weiterführende-stände).
+> **Dies ist der Stand `01-paginierung`.** Er baut auf `main` auf und ergänzt das
+> cursorbasierte Blättern – siehe [Eine Million Kunden](#eine-million-kunden). Die
+> übrigen Stände stehen unten unter
+> [Weiterführende Stände](#weiterführende-stände).
 
 ## Die Daten
 
@@ -50,16 +51,18 @@ angelegt wurde.
 ### Alle Kunden lesen
 
 ```
-GET /customers?state=aktiv
-→ 200  { "items": [ … ] }
-→ 400  ungültiger Parameter
+GET /customers?state=aktiv&limit=50&cursor=eyJhZnRlciI6IjNmYTg1ZjY0In0
+→ 200  { "items": [ … ], "nextCursor": "eyJhZnRlciI6IjkxYzAxZjIzIn0" }
+→ 400  ungültiger Parameter oder abgelaufener Cursor
 ```
 
-**Die Liste ist ein Objekt mit einem Feld, kein nacktes Array.** Nur so lassen sich
-später Gesamtzahl, Seitenangaben oder Verweise ergänzen, ohne einen einzigen
-Aufrufer zu brechen. Genau davon lebt der Stand
-[`01-paginierung`](#weiterführende-stände): Er ergänzt ein Feld – und bricht
-niemanden.
+**Die Liste ist ein Objekt mit einem Feld, kein nacktes Array.** Genau davon lebt
+dieser Stand: `nextCursor` ist ein **neues Feld in einem bestehenden Objekt** und
+bricht keinen einzigen Aufrufer von `main`. Wäre die Antwort ein nacktes Array
+gewesen, hätte die Paginierung sie ersetzen müssen – und das ist ein Bruch.
+
+Warum überhaupt geblättert wird und warum mit einem Cursor statt mit `page`, steht
+unter [Eine Million Kunden](#eine-million-kunden).
 
 Die Bezahldaten sind hier **nicht** enthalten – siehe
 [Bezahldaten](#bezahldaten-eingebettet-oder-eigene-ressource).
@@ -234,6 +237,57 @@ idempotent.
 **Die Entscheidungsfragen:** Braucht Ihr eine Historie? Muss der Aufruf wiederholbar
 sein? Wie viele Zustände gibt es – und kommen noch welche dazu?
 
+### Eine Million Kunden
+
+`GET /customers` **ohne Grenze** ist eine Zeitbombe. Nicht „langsam“, sondern der
+Reihe nach kaputt: Die Datenbank hält die Ergebnismenge im Speicher, der Service
+baut daraus Objekte und geht auf dem Heap ein, das Gateway puffert und läuft in
+seinen Timeout, und der Browser friert beim Parsen ein. Vier Stellen, ein Aufruf.
+
+**Gewählt: cursorbasiert.**
+
+```
+GET /customers?limit=50
+→ 200  { "items": [ 50 Kunden ], "nextCursor": "eyJhZnRlciI6IjkxYzAxZjIzIn0" }
+
+GET /customers?limit=50&cursor=eyJhZnRlciI6IjkxYzAxZjIzIn0
+→ 200  { "items": [ die nächsten 50 ], "nextCursor": null }
+```
+
+`nextCursor: null` heißt: Das war die letzte Seite.
+
+*Warum nicht `page` und `size`?* Weil seitenbasiertes Blättern eine Annahme macht,
+die nicht hält: **dass sich der Bestand zwischen zwei Anfragen nicht ändert.**
+
+> Seite 1 liefert die Kunden 1–50. Bevor der Aufrufer Seite 2 holt, wird Kunde 3
+> gelöscht. Alles rutscht eine Position nach vorn – der frühere Kunde 51 steht
+> jetzt auf Position 50. Seite 2 beginnt bei 51. **Ein Kunde wurde nie
+> ausgeliefert**, und niemand merkt es: Jede einzelne Antwort war korrekt.
+
+Umgekehrt genauso: Wird jemand eingefügt, erscheint ein Eintrag zweimal. Bei einem
+nächtlichen Abzug, der jeden Datensatz genau einmal braucht, ist das der
+Unterschied zwischen „läuft“ und „läuft falsch“.
+
+Der Cursor macht diese Annahme nicht. Er beschreibt keine Position in einer Liste,
+sondern **einen Punkt im Bestand** – „weiter hinter diesem Eintrag“. Was davor
+passiert, ist ihm gleichgültig.
+
+*Der Preis:* Man kann nicht auf Seite 7 springen. Keine Seitenzahlen unten am
+Bildschirm, kein „Seite 12 von 340“. Wer eine Oberfläche mit Seitenzahlen bauen
+muss, braucht `page`/`size` – und lebt mit den Sprüngen. **Das ist die
+Entscheidungsfrage:** Blättert jemand durch, oder arbeitet etwas die Liste ab?
+
+*Und der Cursor ist undurchsichtig.* Er sieht aus wie Base64, und das ist kein
+Zufall: Wer ihn auseinandernimmt und die Kennung darin ausliest, baut auf ein
+Implementierungsdetail. Er wird weitergereicht, nicht interpretiert.
+
+*Keine Gesamtzahl.* `total` kostet eine zweite, teure Abfrage über den ganzen
+Bestand und stimmt trotzdem nur für einen Augenblick. Wer sie wirklich braucht,
+soll sie anfordern müssen.
+
+Ausführlich in den
+[Zalando-Guidelines](https://opensource.zalando.com/restful-api-guidelines/#pagination).
+
 ### Mehrere Kunden auf einmal
 
 Kommt regelmäßig als Wunsch: *„Können wir nicht 500 Kunden in einem Aufruf
@@ -271,14 +325,14 @@ Client muss es trotzdem neu lernen. Dafür gibt es einen Standard – der Stand
 
 ## Weiterführende Stände
 
-Vier Themen des Kurses sind nicht in diesem Entwurf, sondern in eigenen Branches.
-Jeder baut auf dem vorigen auf, sodass der letzte die vollständige API zeigt. Die
-Swagger UI schaltet oben links zwischen ihnen um.
+Dieser Entwurf ist der Stand `01-paginierung`. Er baut auf `main` auf, und
+darüber liegen weitere Stände. Die Swagger UI schaltet oben links zwischen ihnen
+um.
 
 | Stand | Was dazukommt | Kursmodul | Diff |
 | ----- | ------------- | --------- | ---- |
-| `main` **· Du bist hier** | Der Kern: Ressourcen, Methoden, Statuscodes, Schemas | – | – |
-| [`01-paginierung`](https://atvantage-academy.github.io/sample-customer-api/?spec=01-paginierung) | Cursorbasiertes Blättern über die Kundenliste | Best Practices | [PR #2](https://github.com/atvantage-academy/sample-customer-api/pull/2) |
+| [`main`](https://atvantage-academy.github.io/sample-customer-api/?spec=main) | Der Kern: Ressourcen, Methoden, Statuscodes, Schemas | – | – |
+| `01-paginierung` **· Du bist hier** | Cursorbasiertes Blättern über die Kundenliste | Best Practices | [PR #2](https://github.com/atvantage-academy/sample-customer-api/pull/2) |
 | [`02-problem-details`](https://atvantage-academy.github.io/sample-customer-api/?spec=02-problem-details) | Fehlerformat nach RFC 9457 statt des eigenen | Best Practices | [PR #3](https://github.com/atvantage-academy/sample-customer-api/pull/3) |
 | [`03-hypermedia-hal`](https://atvantage-academy.github.io/sample-customer-api/?spec=03-hypermedia-hal) | HAL: Die Antwort trägt ihre nächsten Schritte mit | Hypermedia und HAL | [PR #4](https://github.com/atvantage-academy/sample-customer-api/pull/4) |
 | [`04-autorisierung`](https://atvantage-academy.github.io/sample-customer-api/?spec=04-autorisierung) | OAuth 2, Scopes, `401` und `403` | Rund um die API | [PR #5](https://github.com/atvantage-academy/sample-customer-api/pull/5) |
