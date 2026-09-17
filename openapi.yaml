@@ -125,13 +125,14 @@ paths:
           $ref: '#/components/responses/BadRequest'
 
   /customers/{id}:
-    parameters:
-      - $ref: '#/components/parameters/customerId'
-
     get:
       tags: [customers]
       operationId: readCustomer
       summary: Einen Kunden lesen
+      # Gehoerte eigentlich auf Pfadebene - Swagger UI loest dort bei
+      # OpenAPI 3.1 kein $ref auf. Begruendung: components/parameters.
+      parameters:
+        - $ref: '#/components/parameters/customerId'
       responses:
         '200':
           description: Der Kunde wurde gefunden
@@ -149,6 +150,10 @@ paths:
       description: |
         **Ersetzt den Datensatz vollständig.** Felder, die nicht mitgeschickt
         werden, sind danach leer. Für Teiländerungen `PATCH` verwenden.
+      # Gehoerte eigentlich auf Pfadebene - Swagger UI loest dort bei
+      # OpenAPI 3.1 kein $ref auf. Begruendung: components/parameters.
+      parameters:
+        - $ref: '#/components/parameters/customerId'
       requestBody:
         required: true
         content:
@@ -171,6 +176,10 @@ paths:
       tags: [customers]
       operationId: updateCustomer
       summary: Einzelne Felder eines Kunden ändern
+      # Gehoerte eigentlich auf Pfadebene - Swagger UI loest dort bei
+      # OpenAPI 3.1 kein $ref auf. Begruendung: components/parameters.
+      parameters:
+        - $ref: '#/components/parameters/customerId'
       requestBody:
         required: true
         content:
@@ -193,6 +202,10 @@ paths:
         Idempotent: Beim zweiten Aufruf ist der Kunde immer noch weg. Diese API
         antwortet dann `404` – der Zustand ist derselbe, nur die Antwort
         unterscheidet sich.
+      # Gehoerte eigentlich auf Pfadebene - Swagger UI loest dort bei
+      # OpenAPI 3.1 kein $ref auf. Begruendung: components/parameters.
+      parameters:
+        - $ref: '#/components/parameters/customerId'
       responses:
         '204':
           description: Der Kunde wurde gelöscht
@@ -200,13 +213,14 @@ paths:
           $ref: '#/components/responses/NotFound'
 
   /customers/{id}/address:
-    parameters:
-      - $ref: '#/components/parameters/customerId'
-
     get:
       tags: [address]
       operationId: readAddress
       summary: Die Anschrift lesen
+      # Gehoerte eigentlich auf Pfadebene - Swagger UI loest dort bei
+      # OpenAPI 3.1 kein $ref auf. Begruendung: components/parameters.
+      parameters:
+        - $ref: '#/components/parameters/customerId'
       responses:
         '200':
           description: Die Anschrift wurde gefunden
@@ -228,6 +242,10 @@ paths:
       description: |
         Es gibt genau **eine** Anschrift, und der Client kennt ihren Inhalt
         vollständig – deshalb PUT. Zweimal gesendet ändert nichts.
+      # Gehoerte eigentlich auf Pfadebene - Swagger UI loest dort bei
+      # OpenAPI 3.1 kein $ref auf. Begruendung: components/parameters.
+      parameters:
+        - $ref: '#/components/parameters/customerId'
       requestBody:
         required: true
         content:
@@ -243,12 +261,14 @@ paths:
           $ref: '#/components/responses/NotFound'
 
   /customers/{id}/payments:
-    parameters:
-      - $ref: '#/components/parameters/customerId'
     get:
       tags: [payments]
       operationId: readPayments
       summary: Alle hinterlegten Bezahldaten lesen
+      # Gehoerte eigentlich auf Pfadebene - Swagger UI loest dort bei
+      # OpenAPI 3.1 kein $ref auf. Begruendung: components/parameters.
+      parameters:
+        - $ref: '#/components/parameters/customerId'
       responses:
         '200':
           description: Die Bezahldaten wurden gelesen
@@ -260,12 +280,14 @@ paths:
           $ref: '#/components/responses/NotFound'
 
   /customers/{id}/payments/paypal:
-    parameters:
-      - $ref: '#/components/parameters/customerId'
     get:
       tags: [payments]
       operationId: readPayPal
       summary: Die PayPal-Daten lesen
+      # Gehoerte eigentlich auf Pfadebene - Swagger UI loest dort bei
+      # OpenAPI 3.1 kein $ref auf. Begruendung: components/parameters.
+      parameters:
+        - $ref: '#/components/parameters/customerId'
       responses:
         '200':
           description: Die PayPal-Daten wurden gefunden
@@ -283,6 +305,10 @@ paths:
       tags: [payments]
       operationId: replacePayPal
       summary: Die PayPal-Daten setzen oder ersetzen
+      # Gehoerte eigentlich auf Pfadebene - Swagger UI loest dort bei
+      # OpenAPI 3.1 kein $ref auf. Begruendung: components/parameters.
+      parameters:
+        - $ref: '#/components/parameters/customerId'
       requestBody:
         required: true
         content:
@@ -300,6 +326,10 @@ paths:
       tags: [payments]
       operationId: deletePayPal
       summary: Die PayPal-Daten entfernen
+      # Gehoerte eigentlich auf Pfadebene - Swagger UI loest dort bei
+      # OpenAPI 3.1 kein $ref auf. Begruendung: components/parameters.
+      parameters:
+        - $ref: '#/components/parameters/customerId'
       responses:
         '204':
           description: Die PayPal-Daten wurden entfernt
@@ -307,12 +337,14 @@ paths:
           $ref: '#/components/responses/NotFound'
 
   /customers/{id}/payments/creditcard:
-    parameters:
-      - $ref: '#/components/parameters/customerId'
     get:
       tags: [payments]
       operationId: readCreditCard
       summary: Die Kreditkartendaten lesen
+      # Gehoerte eigentlich auf Pfadebene - Swagger UI loest dort bei
+      # OpenAPI 3.1 kein $ref auf. Begruendung: components/parameters.
+      parameters:
+        - $ref: '#/components/parameters/customerId'
       responses:
         '200':
           description: Die Kreditkartendaten wurden gefunden
@@ -330,6 +362,10 @@ paths:
       tags: [payments]
       operationId: replaceCreditCard
       summary: Die Kreditkartendaten setzen oder ersetzen
+      # Gehoerte eigentlich auf Pfadebene - Swagger UI loest dort bei
+      # OpenAPI 3.1 kein $ref auf. Begruendung: components/parameters.
+      parameters:
+        - $ref: '#/components/parameters/customerId'
       requestBody:
         required: true
         content:
@@ -347,6 +383,10 @@ paths:
       tags: [payments]
       operationId: deleteCreditCard
       summary: Die Kreditkartendaten entfernen
+      # Gehoerte eigentlich auf Pfadebene - Swagger UI loest dort bei
+      # OpenAPI 3.1 kein $ref auf. Begruendung: components/parameters.
+      parameters:
+        - $ref: '#/components/parameters/customerId'
       responses:
         '204':
           description: Die Kreditkartendaten wurden entfernt
@@ -354,8 +394,6 @@ paths:
           $ref: '#/components/responses/NotFound'
 
   /customers/{id}/flags/deactivation:
-    parameters:
-      - $ref: '#/components/parameters/customerId'
     description: |
       Der Deaktivierungs-Schalter. Gesetzt = der Kunde hat sein Konto stillgelegt.
 
@@ -367,6 +405,10 @@ paths:
       tags: [flags]
       operationId: readDeactivationFlag
       summary: Ist das Konto deaktiviert?
+      # Gehoerte eigentlich auf Pfadebene - Swagger UI loest dort bei
+      # OpenAPI 3.1 kein $ref auf. Begruendung: components/parameters.
+      parameters:
+        - $ref: '#/components/parameters/customerId'
       responses:
         '200':
           description: Der Schalter ist gesetzt – das Konto ist deaktiviert
@@ -384,6 +426,10 @@ paths:
       tags: [flags]
       operationId: setDeactivationFlag
       summary: Das Konto deaktivieren
+      # Gehoerte eigentlich auf Pfadebene - Swagger UI loest dort bei
+      # OpenAPI 3.1 kein $ref auf. Begruendung: components/parameters.
+      parameters:
+        - $ref: '#/components/parameters/customerId'
       requestBody:
         required: false
         content:
@@ -407,6 +453,10 @@ paths:
       tags: [flags]
       operationId: clearDeactivationFlag
       summary: Das Konto wieder aktivieren
+      # Gehoerte eigentlich auf Pfadebene - Swagger UI loest dort bei
+      # OpenAPI 3.1 kein $ref auf. Begruendung: components/parameters.
+      parameters:
+        - $ref: '#/components/parameters/customerId'
       responses:
         '204':
           description: Das Konto ist nicht mehr deaktiviert – auch wenn es das vorher schon nicht war
@@ -414,8 +464,6 @@ paths:
           $ref: '#/components/responses/NotFound'
 
   /customers/{id}/flags/lock:
-    parameters:
-      - $ref: '#/components/parameters/customerId'
     description: |
       Der Sperr-Schalter. Gesetzt = das Konto ist gesperrt.
 
@@ -428,6 +476,10 @@ paths:
       tags: [flags]
       operationId: readLockFlag
       summary: Ist das Konto gesperrt?
+      # Gehoerte eigentlich auf Pfadebene - Swagger UI loest dort bei
+      # OpenAPI 3.1 kein $ref auf. Begruendung: components/parameters.
+      parameters:
+        - $ref: '#/components/parameters/customerId'
       responses:
         '200':
           description: Der Schalter ist gesetzt – das Konto ist gesperrt
@@ -448,6 +500,10 @@ paths:
       description: |
         Geht aus **jedem** Zustand – ein deaktiviertes Konto darf ebenso gesperrt
         werden wie ein aktives.
+      # Gehoerte eigentlich auf Pfadebene - Swagger UI loest dort bei
+      # OpenAPI 3.1 kein $ref auf. Begruendung: components/parameters.
+      parameters:
+        - $ref: '#/components/parameters/customerId'
       requestBody:
         required: false
         content:
@@ -466,6 +522,10 @@ paths:
       description: |
         Hebt **nur** die Sperre auf. War das Konto vorher zusätzlich deaktiviert,
         ist es danach deaktiviert und nicht aktiv.
+      # Gehoerte eigentlich auf Pfadebene - Swagger UI loest dort bei
+      # OpenAPI 3.1 kein $ref auf. Begruendung: components/parameters.
+      parameters:
+        - $ref: '#/components/parameters/customerId'
       responses:
         '204':
           description: Die Sperre ist aufgehoben – auch wenn es keine gab
@@ -475,6 +535,24 @@ paths:
 components:
 
   parameters:
+    # WARUM DIESER PARAMETER AN JEDER OPERATION STEHT UND NICHT AM PFAD
+    #
+    # Richtig waere die Pfadebene: Ein `parameters`-Block direkt unter
+    # `/customers/{id}` gilt fuer ALLE Methoden darunter, und die Kennung ist
+    # bei GET, PUT, PATCH und DELETE dieselbe. So stuende sie einmal statt
+    # viermal.
+    #
+    # Swagger UI rendert das bei OpenAPI 3.1 falsch: Ein $ref in den
+    # `parameters` AUF PFADEBENE wird nicht aufgeloest, die Oberflaeche zeigt
+    # statt Name und Typ nur "any". Mit `openapi: 3.0.3` funktioniert dasselbe
+    # Dokument, und auf Operationsebene funktioniert der $ref auch unter 3.1 -
+    # geprueft mit swagger-ui-dist 5.32 und 5.33.
+    #
+    # Deshalb steht der $ref hier an jeder Operation. Das ist ein Zugestaendnis
+    # an ein Werkzeug, keine Entwurfsentscheidung - und ein Beleg fuer den Satz
+    # aus dem Kursmodul: Manche Werkzeuge hinken bei 3.1 hinterher, das prueft
+    # man VOR der Festlegung. Wer dieses Dokument in einem anderen Werkzeug
+    # weiterverwendet, darf die Bloecke wieder auf die Pfadebene ziehen.
     customerId:
       name: id
       in: path
