@@ -17,7 +17,10 @@
   --avd-metanav:     #F4F4F4;   /* Meta-Flaeche */
   --avd-border:      #E6E8EA;   /* Haarlinien */
   --avd-font: 'Outfit', 'Segoe UI', system-ui, -apple-system, sans-serif;
-  --avd-mono: 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', monospace;
+  /* Dieselbe Reihenfolge wie im Academy-Theme (tokens.css), damit Code hier
+     und in den Kursunterlagen gleich aussieht. */
+  --avd-mono: 'Consolas', 'SF Mono', ui-monospace, monospace;
+  --avd-code-bg: #EDEDED;       /* --avd-gray-card, die Code-Flaeche des Themes */
 }
 
 html { color-scheme: light; }
