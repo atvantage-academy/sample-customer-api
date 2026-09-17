@@ -275,12 +275,15 @@ Vier Themen des Kurses sind nicht in diesem Entwurf, sondern in eigenen Branches
 Jeder baut auf dem vorigen auf, sodass der letzte die vollständige API zeigt. Die
 Swagger UI schaltet oben links zwischen ihnen um.
 
-| Stand | Was dazukommt | Kursmodul |
-| ----- | ------------- | --------- |
-| [`01-paginierung`](https://atvantage-academy.github.io/sample-customer-api/?spec=01-paginierung) | Cursorbasiertes Blättern über die Kundenliste | Best Practices |
-| [`02-problem-details`](https://atvantage-academy.github.io/sample-customer-api/?spec=02-problem-details) | Fehlerformat nach RFC 9457 statt des eigenen | Best Practices |
-| [`03-hypermedia-hal`](https://atvantage-academy.github.io/sample-customer-api/?spec=03-hypermedia-hal) | HAL: Die Antwort trägt ihre nächsten Schritte mit | Hypermedia und HAL |
-| [`04-autorisierung`](https://atvantage-academy.github.io/sample-customer-api/?spec=04-autorisierung) | OAuth 2, Scopes, `401` und `403` | Rund um die API |
+| Stand | Was dazukommt | Kursmodul | Diff |
+| ----- | ------------- | --------- | ---- |
+| `main` **· Du bist hier** | Der Kern: Ressourcen, Methoden, Statuscodes, Schemas | – | – |
+| [`01-paginierung`](https://atvantage-academy.github.io/sample-customer-api/?spec=01-paginierung) | Cursorbasiertes Blättern über die Kundenliste | Best Practices | [PR #2](https://github.com/atvantage-academy/sample-customer-api/pull/2) |
+| [`02-problem-details`](https://atvantage-academy.github.io/sample-customer-api/?spec=02-problem-details) | Fehlerformat nach RFC 9457 statt des eigenen | Best Practices | [PR #3](https://github.com/atvantage-academy/sample-customer-api/pull/3) |
+| [`03-hypermedia-hal`](https://atvantage-academy.github.io/sample-customer-api/?spec=03-hypermedia-hal) | HAL: Die Antwort trägt ihre nächsten Schritte mit | Hypermedia und HAL | [PR #4](https://github.com/atvantage-academy/sample-customer-api/pull/4) |
+| [`04-autorisierung`](https://atvantage-academy.github.io/sample-customer-api/?spec=04-autorisierung) | OAuth 2, Scopes, `401` und `403` | Rund um die API | [PR #5](https://github.com/atvantage-academy/sample-customer-api/pull/5) |
 
 Was jeder Stand konkret ändert und **warum**, steht in der `README.md` des
-jeweiligen Branches.
+jeweiligen Branches. Die **Diff**-Spalte führt zu einem Pull Request gegen die Zeile
+darüber. Er bleibt offen und wird nie gemergt – er zeigt nur die Änderung, Zeile für
+Zeile und mit Kommentarmöglichkeit.

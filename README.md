@@ -26,16 +26,22 @@ Die weiterführenden Themen des Kurses liegen in **eigenen Branches**. Jeder bau
 auf dem vorigen auf, sodass der letzte die vollständige API zeigt. In der Swagger
 UI schaltest Du oben links zwischen ihnen um.
 
-| Stand | Was dazukommt | Ansehen |
-| ----- | ------------- | ------- |
-| `main` | Der Kern des Entwurfs | [Swagger UI](https://atvantage-academy.github.io/sample-customer-api/?spec=main) · [`openapi.yaml`](../../blob/main/openapi.yaml) |
-| `01-paginierung` | Cursorbasiertes Blättern über die Kundenliste | [Swagger UI](https://atvantage-academy.github.io/sample-customer-api/?spec=01-paginierung) · [`openapi.yaml`](../../blob/01-paginierung/openapi.yaml) |
-| `02-problem-details` | Fehlerformat nach RFC 9457 statt des eigenen | [Swagger UI](https://atvantage-academy.github.io/sample-customer-api/?spec=02-problem-details) · [`openapi.yaml`](../../blob/02-problem-details/openapi.yaml) |
-| `03-hypermedia-hal` | HAL: Die Antwort trägt ihre nächsten Schritte mit | [Swagger UI](https://atvantage-academy.github.io/sample-customer-api/?spec=03-hypermedia-hal) · [`openapi.yaml`](../../blob/03-hypermedia-hal/openapi.yaml) |
-| `04-autorisierung` | OAuth 2, Scopes, `401` und `403` | [Swagger UI](https://atvantage-academy.github.io/sample-customer-api/?spec=04-autorisierung) · [`openapi.yaml`](../../blob/04-autorisierung/openapi.yaml) |
+| Stand | Was dazukommt | Ansehen | Diff |
+| ----- | ------------- | ------- | ---- |
+| `main` **· Du bist hier** | Der Kern: Ressourcen, Methoden, Statuscodes, Schemas | [Swagger UI](https://atvantage-academy.github.io/sample-customer-api/?spec=main) · [YAML](../../blob/main/openapi.yaml) | – |
+| [`01-paginierung`](https://atvantage-academy.github.io/sample-customer-api/?spec=01-paginierung) | Cursorbasiertes Blättern über die Kundenliste | [Swagger UI](https://atvantage-academy.github.io/sample-customer-api/?spec=01-paginierung) · [YAML](../../blob/01-paginierung/openapi.yaml) | [PR #2](https://github.com/atvantage-academy/sample-customer-api/pull/2) |
+| [`02-problem-details`](https://atvantage-academy.github.io/sample-customer-api/?spec=02-problem-details) | Fehlerformat nach RFC 9457 statt des eigenen | [Swagger UI](https://atvantage-academy.github.io/sample-customer-api/?spec=02-problem-details) · [YAML](../../blob/02-problem-details/openapi.yaml) | [PR #3](https://github.com/atvantage-academy/sample-customer-api/pull/3) |
+| [`03-hypermedia-hal`](https://atvantage-academy.github.io/sample-customer-api/?spec=03-hypermedia-hal) | HAL: Die Antwort trägt ihre nächsten Schritte mit | [Swagger UI](https://atvantage-academy.github.io/sample-customer-api/?spec=03-hypermedia-hal) · [YAML](../../blob/03-hypermedia-hal/openapi.yaml) | [PR #4](https://github.com/atvantage-academy/sample-customer-api/pull/4) |
+| [`04-autorisierung`](https://atvantage-academy.github.io/sample-customer-api/?spec=04-autorisierung) | OAuth 2, Scopes, `401` und `403` | [Swagger UI](https://atvantage-academy.github.io/sample-customer-api/?spec=04-autorisierung) · [YAML](../../blob/04-autorisierung/openapi.yaml) | [PR #5](https://github.com/atvantage-academy/sample-customer-api/pull/5) |
 
-**Was ein Stand geändert hat und warum**, steht in der `README.md` seines Branches –
-und der Diff zeigt es in einem Bild:
+**Die Diff-Spalte ist der interessanteste Teil.** Jeder Stand hat einen Pull
+Request gegen die Zeile darüber, und der bleibt **bewusst offen** – er wird nie
+gemergt. Er zeigt Zeile für Zeile, was ein einzelnes Thema an einer fertigen API
+verändert: *Was macht Paginierung aus einer Listenoperation? Was kostet Hypermedia,
+und was bekommt man dafür?* Worauf dabei zu achten ist, steht jeweils in der
+Beschreibung des Pull Requests.
+
+Wer das Repository geklont hat, kommt auch ohne Browser dorthin:
 
 ```
 # Was fügt die Paginierung hinzu?
