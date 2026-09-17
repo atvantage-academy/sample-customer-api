@@ -7,8 +7,8 @@ später bzw. in einem eigenen Kurs.
 **Annahme durchgehend:** JSON ist das einzige Austauschformat. `Accept` und
 `Content-Type` sind deshalb unten nicht bei jeder Operation erwähnt.
 
-> **Dies ist der Stand `01-paginierung`.** Er baut auf `main` auf und ergänzt das
-> cursorbasierte Blättern – siehe [Eine Million Kunden](#eine-million-kunden). Die
+> **Dies ist der Stand `02-problem-details`.** Er baut auf `01-paginierung` auf und
+> tauscht das Fehlerformat gegen den Standard – siehe [Fehler](#fehler). Die
 > übrigen Stände stehen unten unter
 > [Weiterführende Stände](#weiterführende-stände).
 
@@ -300,40 +300,54 @@ Operations](https://www.mscharhag.com/api-design/bulk-and-batch-operations).
 
 ## Fehler
 
-Jede Fehlerantwort trägt einen Körper, und zwar in **einem** Format – nicht mal so,
-mal anders:
+Alle Fehlerantworten folgen **RFC 9457** (*Problem Details for HTTP APIs*),
+Medientyp `application/problem+json`:
 
 ```json
 {
-  "message": "Die Kundendaten sind nicht gültig.",
-  "fields": [
+  "type": "https://api.example.com/problems/validation-error",
+  "title": "Die Kundendaten sind nicht gültig",
+  "status": 400,
+  "detail": "2 Felder sind fehlerhaft.",
+  "instance": "/customers",
+  "errors": [
     { "field": "name", "message": "mindestens 3 Zeichen" },
     { "field": "birthdate", "message": "darf nicht in der Zukunft liegen" }
   ]
 }
 ```
 
-**Alle fehlerhaften Felder auf einmal** – sonst braucht der Aufrufer mehrere
-Anläufe.
+**Auswertbar ist `type`** – darauf darf ein Programm Logik bauen. `title` und
+`detail` sind für Menschen und dürfen sich jederzeit ändern.
+
+Bis hierhin trug die API ein **selbst erfundenes** Format (`{ "message": …,
+"fields": […] }`). Es tat dasselbe. Der Unterschied ist nicht technisch:
+
+- Ein Client, der schon einmal Problem Details verarbeitet hat, versteht auch
+  diese Antwort. Beim eigenen Format fängt jeder bei null an.
+- Gateways, Bibliotheken und Logging kennen den Medientyp bereits.
+- `errors` bleibt trotzdem möglich – **RFC 9457 ist ausdrücklich erweiterbar.**
+  Wer das Feld nicht kennt, liest `type` und `title` und kommt zurecht.
+
+*Und die Frage, die im Kurs zuverlässig kommt:* Warum steht der Statuscode
+**zweimal** da, in der Statuszeile und im Körper? Weil der Körper weitergereicht,
+protokolliert und weitergeleitet wird – irgendwann ohne die Statuszeile. Redundanz
+ist hier Absicht, nicht Schlamperei.
 
 Und was **nicht** hineingehört: Stacktraces, Klassennamen, SQL-Fragmente, Pfade.
 Eine Fehlerantwort geht nach außen.
 
-Das Format oben ist allerdings **selbst erfunden**. Es tut, was es soll, und jeder
-Client muss es trotzdem neu lernen. Dafür gibt es einen Standard – der Stand
-[`02-problem-details`](#weiterführende-stände) führt ihn ein.
-
 ## Weiterführende Stände
 
-Dieser Entwurf ist der Stand `01-paginierung`. Er baut auf `main` auf, und
+Dieser Entwurf ist der Stand `02-problem-details`. Er baut auf `01-paginierung` auf, und
 darüber liegen weitere Stände. Die Swagger UI schaltet oben links zwischen ihnen
 um.
 
 | Stand | Was dazukommt | Kursmodul | Diff |
 | ----- | ------------- | --------- | ---- |
 | [`main`](https://atvantage-academy.github.io/sample-customer-api/?spec=main) | Der Kern: Ressourcen, Methoden, Statuscodes, Schemas | – | – |
-| `01-paginierung` **· Du bist hier** | Cursorbasiertes Blättern über die Kundenliste | Best Practices | [PR #2](https://github.com/atvantage-academy/sample-customer-api/pull/2) |
-| [`02-problem-details`](https://atvantage-academy.github.io/sample-customer-api/?spec=02-problem-details) | Fehlerformat nach RFC 9457 statt des eigenen | Best Practices | [PR #3](https://github.com/atvantage-academy/sample-customer-api/pull/3) |
+| [`01-paginierung`](https://atvantage-academy.github.io/sample-customer-api/?spec=01-paginierung) | Cursorbasiertes Blättern über die Kundenliste | Best Practices | [PR #2](https://github.com/atvantage-academy/sample-customer-api/pull/2) |
+| `02-problem-details` **· Du bist hier** | Fehlerformat nach RFC 9457 statt des eigenen | Best Practices | [PR #3](https://github.com/atvantage-academy/sample-customer-api/pull/3) |
 | [`03-hypermedia-hal`](https://atvantage-academy.github.io/sample-customer-api/?spec=03-hypermedia-hal) | HAL: Die Antwort trägt ihre nächsten Schritte mit | Hypermedia und HAL | [PR #4](https://github.com/atvantage-academy/sample-customer-api/pull/4) |
 | [`04-autorisierung`](https://atvantage-academy.github.io/sample-customer-api/?spec=04-autorisierung) | OAuth 2, Scopes, `401` und `403` | Rund um die API | [PR #5](https://github.com/atvantage-academy/sample-customer-api/pull/5) |
 
