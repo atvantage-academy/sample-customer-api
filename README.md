@@ -16,6 +16,35 @@ richtige.
 | [`openapi.yaml`](openapi.yaml) | Derselbe Entwurf als **OpenAPI 3.1** – das Ergebnis des zweiten Tages. |
 | [Swagger UI](https://atvantage-academy.github.io/sample-customer-api/) | Dieselbe Beschreibung als **durchsuchbare Dokumentation** zum Anklicken. |
 
+## Die Stände
+
+Dieser Branch – `main` – ist **der Kern**: Ressourcen, Methoden, Statuscodes,
+Schemas. Mehr nicht, und das mit Absicht. Wer den Entwurf aus der Übung
+nachvollziehen will, ist hier richtig.
+
+Die weiterführenden Themen des Kurses liegen in **eigenen Branches**. Jeder baut
+auf dem vorigen auf, sodass der letzte die vollständige API zeigt. In der Swagger
+UI schaltest Du oben links zwischen ihnen um.
+
+| Stand | Was dazukommt | Ansehen |
+| ----- | ------------- | ------- |
+| `main` | Der Kern des Entwurfs | [Swagger UI](https://atvantage-academy.github.io/sample-customer-api/?spec=main) · [`openapi.yaml`](../../blob/main/openapi.yaml) |
+| `01-paginierung` | Cursorbasiertes Blättern über die Kundenliste | [Swagger UI](https://atvantage-academy.github.io/sample-customer-api/?spec=01-paginierung) · [`openapi.yaml`](../../blob/01-paginierung/openapi.yaml) |
+| `02-problem-details` | Fehlerformat nach RFC 9457 statt des eigenen | [Swagger UI](https://atvantage-academy.github.io/sample-customer-api/?spec=02-problem-details) · [`openapi.yaml`](../../blob/02-problem-details/openapi.yaml) |
+| `03-hypermedia-hal` | HAL: Die Antwort trägt ihre nächsten Schritte mit | [Swagger UI](https://atvantage-academy.github.io/sample-customer-api/?spec=03-hypermedia-hal) · [`openapi.yaml`](../../blob/03-hypermedia-hal/openapi.yaml) |
+| `04-autorisierung` | OAuth 2, Scopes, `401` und `403` | [Swagger UI](https://atvantage-academy.github.io/sample-customer-api/?spec=04-autorisierung) · [`openapi.yaml`](../../blob/04-autorisierung/openapi.yaml) |
+
+**Was ein Stand geändert hat und warum**, steht in der `README.md` seines Branches –
+und der Diff zeigt es in einem Bild:
+
+```
+# Was fügt die Paginierung hinzu?
+git diff main..01-paginierung -- openapi.yaml
+
+# Was ändert HAL gegenüber dem Stand davor?
+git diff 02-problem-details..03-hypermedia-hal -- openapi.yaml
+```
+
 ## Lies das hier nicht zu früh
 
 Der Wert der Übung liegt im **eigenen Entwurf**, nicht im Abgleich mit einer
@@ -40,9 +69,10 @@ eigentliche Inhalt des Kurses:
 
 - **Eine Implementierung.** Dieses Repository beschreibt eine Schnittstelle, es
   bedient sie nicht. Der Kurs ist sprach- und frameworkneutral.
-- **Paginierung in voller Tiefe, Hypermedia, Versionierung.** Diese Themen sind im
-  Kurs optionale Bausteine; die Musterlösung deutet sie an, wo es hilft, und bleibt
-  sonst schlank.
+- **Ein Server.** Die Adressen zeigen auf `example.com`, weil es nichts gibt, was
+  dahinter antwortet. „Try it out“ ist deshalb abgeschaltet.
+- **Versionierung, Caching, Suche.** Themen des Kurses, die den Entwurf hier nicht
+  verändert hätten – sie stehen in den Unterlagen, nicht in diesem Dokument.
 
 ## Verwendung
 

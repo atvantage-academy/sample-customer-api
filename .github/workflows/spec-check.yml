@@ -1,0 +1,33 @@
+# =============================================================================
+# Prueft die openapi.yaml EINES Branches
+# -----------------------------------------------------------------------------
+# Laeuft auf jedem Branch und in jedem Pull Request. Veroeffentlicht nichts -
+# das tut `pages.yml`, und zwar fuer alle Staende zusammen.
+#
+# Dieser Workflow ist ausserdem der AUSLOESER fuer die Veroeffentlichung: Wird
+# ein Stand geaendert, laeuft er hier durch, und `pages.yml` haengt sich per
+# `workflow_run` daran. Warum nicht direkt aus dem Branch heraus deployen? Weil
+# die Pages-Umgebung ueblicherweise nur Deployments vom Standard-Branch
+# zulaesst. Ein `workflow_run` laeuft IMMER im Kontext des Standard-Branches -
+# damit ist die Regel erfuellt, ohne an den Repository-Einstellungen zu drehen.
+# =============================================================================
+name: OpenAPI pruefen
+
+# Nur `push`, bewusst ohne `pull_request`: Beides zusammen liesse jeden Commit
+# eines Pull Requests aus diesem Repository zweimal pruefen. Die Pruefung haengt
+# am Commit und erscheint dadurch ohnehin am Pull Request.
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: OpenAPI-Dokument pruefen
+        run: npx --yes @redocly/cli@1 lint openapi.yaml --format stylish

@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Account Service API – Musterlösung der ATVANTAGE Academy</title>
+  <meta name="description" content="Musterlösung zur Entwurfsübung aus dem Training „REST APIs – Grundlagen und Design“ der ATVANTAGE Academy.">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="swagger-ui.css">
+  <link rel="stylesheet" href="topbar.css">
+</head>
+<body>
+
+  <!-- Die Leiste ist HANDGESCHRIEBEN und nicht die von Swagger UI. Die
+       mitgelieferte (StandaloneLayout) braeuchte das Standalone-Preset, brauechte
+       rund 300 KB mehr Uebertragung und brachte ein SmartBear-Logo samt einem
+       Eingabefeld mit, ueber das sich eine beliebige fremde Beschreibung laden
+       laesst. Beides gehoert nicht auf eine Schulungsunterlage - die Auswahl der
+       STAENDE dagegen schon. Also: BaseLayout unten, eigene Leiste hier. -->
+  <header class="stand-bar">
+    <a class="stand-bar__brand" href="https://atvantage.com" rel="noopener">
+      <img class="stand-bar__logo" src="logo-atvantage.svg" alt="ATVANTAGE" width="148" height="19">
+      <span class="stand-bar__academy">Academy</span>
+    </a>
+
+    <div class="stand-bar__title">
+      <span class="stand-bar__api">Account Service API</span>
+      <span class="stand-bar__kicker">Musterlösung · REST APIs – Grundlagen und Design</span>
+    </div>
+
+    <div class="stand-bar__switch">
+      <label class="stand-bar__label" for="stand-select">Stand</label>
+      <select class="stand-bar__select" id="stand-select" aria-describedby="stand-note">
+        <option>wird geladen …</option>
+      </select>
+    </div>
+  </header>
+
+  <p class="stand-note" id="stand-note">
+    <span class="stand-note__text">Die Beschreibung wird geladen …</span>
+  </p>
+
+  <div id="swagger-ui"></div>
+
+  <script src="swagger-ui-bundle.js" crossorigin></script>
+  <script src="topbar.js"></script>
+</body>
+</html>

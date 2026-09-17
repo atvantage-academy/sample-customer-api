@@ -1,0 +1,173 @@
+/* =============================================================================
+   Leiste ueber der Swagger UI - ATVANTAGE Academy
+   -----------------------------------------------------------------------------
+   Farben und Schrift stammen aus dem ATVANTAGE-Design-System (Outfit, Slate,
+   Orange). Sie stehen hier als feste Werte, WEIL dieses Repository das Theme
+   nicht einbindet: Es ist eine einzelne statische Seite ohne Build und ohne
+   npm-Abhaengigkeit. Aendert sich die Marke, ist dieser Block die einzige
+   Stelle, die nachzuziehen ist.
+   ============================================================================= */
+
+:root {
+  --avd-slate:       #303E4F;   /* dunkle Flaechen, Marke */
+  --avd-ink:         #1A2627;   /* Ueberschriften */
+  --avd-anthracite:  #343E3F;   /* Fliesstext */
+  --avd-orange:      #FF5401;   /* Akzent */
+  --avd-gray-footer: #5F5F5F;   /* sekundaerer Text */
+  --avd-metanav:     #F4F4F4;   /* Meta-Flaeche */
+  --avd-border:      #E6E8EA;   /* Haarlinien */
+  --avd-font: 'Outfit', 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+html { color-scheme: light; }
+
+body {
+  margin: 0;
+  background: #fafafa;
+}
+
+/* --- Die Leiste ---------------------------------------------------------- */
+
+.stand-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 28px;
+  padding: 14px clamp(16px, 4vw, 40px);
+  background: #fff;
+  border-bottom: 3px solid var(--avd-orange);
+  font-family: var(--avd-font);
+  box-shadow: 0 1px 3px rgba(26, 38, 39, .06);
+}
+
+.stand-bar__brand {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  text-decoration: none;
+  flex: 0 0 auto;
+}
+
+.stand-bar__logo {
+  display: block;
+  width: 148px;
+  height: auto;
+}
+
+.stand-bar__academy {
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: .02em;
+  color: var(--avd-gray-footer);
+}
+
+/* --- Titel --------------------------------------------------------------- */
+
+.stand-bar__title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 260px;
+  min-width: 0;
+  padding-left: 28px;
+  border-left: 1px solid var(--avd-border);
+}
+
+.stand-bar__api {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--avd-ink);
+  line-height: 1.2;
+}
+
+.stand-bar__kicker {
+  font-size: 13px;
+  color: var(--avd-gray-footer);
+  line-height: 1.3;
+}
+
+/* --- Die Umschaltung ----------------------------------------------------- */
+
+.stand-bar__switch {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+
+.stand-bar__label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--avd-gray-footer);
+}
+
+.stand-bar__select {
+  font-family: var(--avd-font);
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--avd-slate);
+  background: #fff;
+  border: 1px solid var(--avd-slate);
+  border-radius: 4px;
+  padding: 7px 34px 7px 12px;
+  min-width: 15rem;
+  cursor: pointer;
+  /* Eigener Pfeil: Der von Safari/Chrome mitgelieferte sitzt sonst in einer
+     anderen Farbe als die Leiste. */
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%23303E4F' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 12px 8px;
+}
+
+.stand-bar__select:hover { border-color: var(--avd-orange); }
+
+.stand-bar__select:focus-visible {
+  outline: 3px solid var(--avd-orange);
+  outline-offset: 2px;
+}
+
+/* --- Die Zeile darunter: was dieser Stand zeigt --------------------------- */
+
+.stand-note {
+  margin: 0;
+  padding: 10px clamp(16px, 4vw, 40px);
+  background: var(--avd-metanav);
+  border-bottom: 1px solid var(--avd-border);
+  font-family: var(--avd-font);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--avd-anthracite);
+}
+
+.stand-note__text { margin-right: .5em; }
+
+.stand-note a {
+  color: var(--avd-orange);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+  white-space: nowrap;
+}
+
+.stand-note a:hover { text-decoration-thickness: 2px; }
+
+/* --- Swagger UI daneben --------------------------------------------------- */
+
+/* Die Info-Sektion von Swagger UI bringt ihren eigenen Titel mit. Er steht
+   direkt unter unserem - das ist eine Dopplung, aber eine nuetzliche: Dort
+   haengen Version, Kontakt und die Beschreibung des Dokuments. Nur der Abstand
+   nach oben wird knapper, damit die Leiste und der Inhalt zusammengehoeren. */
+.swagger-ui .info { margin: 24px 0; }
+
+@media (max-width: 720px) {
+  .stand-bar__title {
+    padding-left: 0;
+    border-left: none;
+    flex-basis: 100%;
+  }
+  .stand-bar__select { min-width: 0; width: 100%; }
+  .stand-bar__switch { flex: 1 1 100%; }
+}
