@@ -1,8 +1,8 @@
 /* =============================================================================
    Leiste ueber der Swagger UI - ATVANTAGE Academy
    -----------------------------------------------------------------------------
-   Farben und Schrift stammen aus dem ATVANTAGE-Design-System (Outfit, Slate,
-   Orange). Sie stehen hier als feste Werte, WEIL dieses Repository das Theme
+   Farben und Schrift stammen aus dem ATVANTAGE-Design-System (Outfit, Orange,
+   Ink). Sie stehen hier als feste Werte, WEIL dieses Repository das Theme
    nicht einbindet: Es ist eine einzelne statische Seite ohne Build und ohne
    npm-Abhaengigkeit. Aendert sich die Marke, ist dieser Block die einzige
    Stelle, die nachzuziehen ist.
@@ -17,6 +17,7 @@
   --avd-metanav:     #F4F4F4;   /* Meta-Flaeche */
   --avd-border:      #E6E8EA;   /* Haarlinien */
   --avd-font: 'Outfit', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --avd-mono: 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', monospace;
 }
 
 html { color-scheme: light; }
@@ -58,7 +59,9 @@ body {
   font-size: 15px;
   font-weight: 500;
   letter-spacing: .02em;
-  color: var(--avd-gray-footer);
+  /* Schwarz neben der orangen Wortmarke - so steht die Marke fuer sich und
+     "Academy" liest sich als Zusatz, nicht als Teil des Logos. */
+  color: var(--avd-ink);
 }
 
 /* --- Titel --------------------------------------------------------------- */
@@ -154,13 +157,7 @@ body {
 
 .stand-note a:hover { text-decoration-thickness: 2px; }
 
-/* --- Swagger UI daneben --------------------------------------------------- */
-
-/* Die Info-Sektion von Swagger UI bringt ihren eigenen Titel mit. Er steht
-   direkt unter unserem - das ist eine Dopplung, aber eine nuetzliche: Dort
-   haengen Version, Kontakt und die Beschreibung des Dokuments. Nur der Abstand
-   nach oben wird knapper, damit die Leiste und der Inhalt zusammengehoeren. */
-.swagger-ui .info { margin: 24px 0; }
+/* Was die Swagger UI selbst betrifft, steht in swagger-theme.css. */
 
 @media (max-width: 720px) {
   .stand-bar__title {

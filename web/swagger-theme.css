@@ -1,0 +1,102 @@
+/* =============================================================================
+   Swagger UI an das ATVANTAGE-Design angleichen
+   -----------------------------------------------------------------------------
+   Swagger UI bringt drei eigene Schriften mit: "Open Sans" fuer Fliesstext,
+   "Titillium Web" fuer Ueberschriften und "Source Code Pro" fuer Code. Damit
+   sieht die Seite unter unserer Leiste aus wie ein fremdes Werkzeug mit einem
+   Aufkleber darauf. Diese Datei zieht die Textschrift auf Outfit und laesst
+   Code monospace - mehr nicht.
+   -----------------------------------------------------------------------------
+   BEWUSST ZURUECKHALTEND: Farben, Abstaende und Bedienelemente von Swagger UI
+   bleiben, wie sie sind. Wer eine Swagger UI kennt, soll sie wiedererkennen -
+   die gruenen POST-Baender und blauen GET-Baender sind Konvention, nicht
+   Geschmack. Angepasst wird nur, was uns gehoert: die Schrift und der Abstand
+   zur Leiste darueber. Wird hier mehr umgefaerbt, bricht es beim naechsten
+   Versionswechsel, weil es an internen Klassennamen haengt.
+   ============================================================================= */
+
+/* Textschrift durchgaengig - EIN Selektor statt der rund vierzig Regeln, mit
+   denen Swagger UI die Schrift setzt.
+   WARUM !important: Swagger UI deklariert `font-family: sans-serif` an
+   spezifischeren Selektoren (`.swagger-ui .info .title`, `.swagger-ui
+   .opblock-tag` und so weiter). Ohne !important gewinnen die, und nur die
+   Leiste oben saehe nach Outfit aus. Die Alternative waere, jeden dieser
+   Selektoren nachzubauen - dann bricht es beim naechsten Versionswechsel.
+   Hier ist !important die stabilere Wahl, nicht die bequemere. */
+.swagger-ui,
+.swagger-ui * { font-family: var(--avd-font) !important; }
+
+/* ... und alles, was Code IST, bleibt monospace. Eine Adresse, ein Feldname
+   oder ein JSON-Beispiel in Proportionalschrift ist schlechter lesbar, nicht
+   schoener. */
+.swagger-ui .microlight,
+.swagger-ui .model,
+.swagger-ui .model-title,
+.swagger-ui .prop-type,
+.swagger-ui .prop-format,
+.swagger-ui .parameter__name,
+.swagger-ui .parameter__type,
+.swagger-ui .parameter__in,
+.swagger-ui .opblock-summary-path,
+.swagger-ui .opblock-summary-path__deprecated,
+.swagger-ui .opblock-summary-operation-id,
+.swagger-ui .response-col_status,
+.swagger-ui .renderedMarkdown code,
+.swagger-ui .markdown code,
+.swagger-ui .markdown pre,
+.swagger-ui code,
+.swagger-ui pre { font-family: var(--avd-mono) !important; }
+
+/* Outfit laeuft etwas schmaler als Titillium Web - die Ueberschriften vertragen
+   deshalb ein wenig mehr Gewicht, damit die Hierarchie erhalten bleibt. */
+.swagger-ui .info .title,
+.swagger-ui h1, .swagger-ui h2, .swagger-ui h3, .swagger-ui h4, .swagger-ui h5,
+.swagger-ui .opblock-tag { font-weight: 600; letter-spacing: -0.01em; }
+
+/* Die Beschreibung oben ist der laengste Fliesstext der Seite und der einzige,
+   den man wirklich LIEST. Sie bekommt Zeilenabstand und eine Zeilenlaenge, bei
+   der das Auge die naechste Zeile noch findet. */
+.swagger-ui .info { margin: 24px 0 32px; }
+
+.swagger-ui .info .markdown p,
+.swagger-ui .info .markdown li,
+.swagger-ui .info .renderedMarkdown p,
+.swagger-ui .info .renderedMarkdown li {
+  font-size: 15px;
+  line-height: 1.65;
+  max-width: 82ch;
+  /* Linksbuendig halten: Swagger UI setzt auf diese Absaetze `margin: auto`.
+     Zusammen mit einer max-width wuerde das den Text mittig stellen - und die
+     Ueberschriften daneben blieben links. */
+  margin-left: 0;
+  margin-right: auto;
+}
+
+.swagger-ui .info .markdown h3,
+.swagger-ui .info .renderedMarkdown h3 {
+  margin-top: 1.75em;
+  padding-top: .75em;
+  border-top: 1px solid #e6e8ea;
+}
+
+/* Die Tabellen in der Beschreibung (die Stand-Uebersicht) kommen von Swagger UI
+   ohne Linien - dann steht dort eine Wand aus Text. */
+.swagger-ui .info table {
+  border-collapse: collapse;
+  max-width: 82ch;
+  margin: 1em auto 1em 0;
+}
+
+.swagger-ui .info table th,
+.swagger-ui .info table td {
+  border-bottom: 1px solid #e6e8ea;
+  padding: 7px 14px 7px 0;
+  text-align: left;
+  vertical-align: top;
+}
+
+.swagger-ui .info table th { font-weight: 600; white-space: nowrap; }
+
+/* Verweise in der Beschreibung im Akzent statt im Swagger-Blau. */
+.swagger-ui .info a,
+.swagger-ui .info a:hover { color: var(--avd-orange); }

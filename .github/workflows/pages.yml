@@ -144,7 +144,7 @@ jobs:
              /tmp/package/swagger-ui-bundle.js \
              /tmp/package/oauth2-redirect.html \
              site/
-          cp web/index.html web/topbar.css web/topbar.js \
+          cp web/index.html web/topbar.css web/swagger-theme.css web/topbar.js \
              web/logo-atvantage.svg web/favicon.svg site/
           cp README.md site/
           cp -r docs site/docs
@@ -154,6 +154,7 @@ jobs:
           set -euo pipefail
           test -s site/index.html     || { echo "FEHLER: index.html fehlt oder ist leer"; exit 1; }
           test -s site/topbar.js      || { echo "FEHLER: topbar.js fehlt";                exit 1; }
+          test -s site/swagger-theme.css || { echo "FEHLER: swagger-theme.css fehlt";       exit 1; }
           test -s site/swagger-ui.css || { echo "FEHLER: Swagger UI fehlt";               exit 1; }
           test -s site/specs.json     || { echo "FEHLER: specs.json fehlt";               exit 1; }
           anzahl=$(jq '.specs | length' site/specs.json)
