@@ -1,4 +1,4 @@
-# Musterlösung: Account Service API — 02 · Problem Details
+# Musterlösung: Account Service API — 03 · Hypermedia (HAL)
 
 Die **Musterlösung** zur Entwurfsübung aus dem Training
 **„REST APIs – Grundlagen und Design“** der [ATVANTAGE Academy](https://atvantage.com).
@@ -18,62 +18,88 @@ richtige.
 
 ## Was dieser Stand ändert
 
-Das selbst erfundene Fehlerobjekt weicht dem Standard **RFC 9457** (*Problem
-Details for HTTP APIs*). Neun Fehlerantworten wechseln dafür den Medientyp.
+Die Kunden-Antworten bekommen eine **zweite Darstellung**: `application/hal+json`
+mit einem `_links`-Block. Die alte unter `application/json` bleibt unverändert.
 
-| | `01-paginierung` | `02-problem-details` |
+| | `02-problem-details` | `03-hypermedia-hal` |
 | --- | --- | --- |
-| Medientyp | `application/json` | `application/problem+json` |
-| Schema | `Error` | `Problem` / `ValidationProblem` |
-| Auswertbar | nichts – `message` ist Prosa | `type`, eine URI |
+| Kunde lesen | `application/json` | zusätzlich `application/hal+json` |
+| Liste lesen | `{ items, nextCursor }` | zusätzlich `{ _links, _embedded }` |
+| Nächste Seite | Cursor selbst anhängen | dem `_links.next` folgen |
 
-**Vorher:**
+```
+GET /customers/{id}
+Accept: application/hal+json
 
-```json
+→ 200
 {
-  "message": "Die Kundendaten sind nicht gültig.",
-  "fields": [ { "field": "name", "message": "mindestens 3 Zeichen" } ]
+  "id": "3fa85f64-…", "name": "Tom Mayer", "state": "aktiv",
+  "_links": {
+    "self":       { "href": "/customers/3fa85f64-…" },
+    "address":    { "href": "/customers/3fa85f64-…/address" },
+    "payments":   { "href": "/customers/3fa85f64-…/payments" },
+    "deactivate": { "href": "/customers/3fa85f64-…/flags/deactivation" },
+    "lock":       { "href": "/customers/3fa85f64-…/flags/lock" }
+  }
 }
 ```
 
-**Nachher:**
+### Der eigentliche Punkt: Die Verweise hängen vom Zustand ab
 
-```json
-{
-  "type": "https://api.example.com/problems/validation-error",
-  "title": "Die Kundendaten sind nicht gültig",
-  "status": 400,
-  "detail": "1 Feld ist fehlerhaft.",
-  "instance": "/customers",
-  "errors": [ { "field": "name", "message": "mindestens 3 Zeichen" } ]
-}
+| `state` | vorhandene Beziehungen |
+| ------- | ---------------------- |
+| `aktiv` | `self`, `address`, `payments`, `deactivate`, `lock` |
+| `deaktiviert` | `self`, `address`, `payments`, `activate`, `lock` |
+| `gesperrt` | `self`, `address`, `payments`, `unlock` |
+
+Ein gesperrtes Konto lässt sich nicht deaktivieren – also fehlt der Verweis. Ein
+deaktiviertes lässt sich sehr wohl sperren – also ist `lock` da.
+
+Dieselbe Regel stand vorher in der Dokumentation. Jetzt steht sie **in der
+Antwort**. Eine Oberfläche kann ihre Knöpfe daraus bauen, ohne zu wissen, was ein
+gesperrtes Konto ist; ändert sich die Regel, zieht sie ohne Änderung mit.
+
+**Genau dafür lohnt sich Hypermedia** – und meistens nur dafür: Abläufe mit
+mehreren Zuständen, bei denen nicht jeder Schritt immer erlaubt ist.
+
+### Und hier hört HAL auf
+
+Ein HAL-Link kennt `href`. **Eine Methode kennt er nicht.**
+
+`deactivate` und `activate` zeigen auf dieselbe Adresse. Der eine meint `PUT`, der
+andere `DELETE`. In der Antwort steht davon nichts – die Bedeutung steckt allein im
+Namen der Beziehung, und den muss der Client vorher kennen. Wer die Methode
+mitliefern will, braucht HAL-FORMS, Siren oder JSON:API.
+
+Eine zweite Grenze zeigt sich in der Beschreibung selbst: Dass `deactivate` nur bei
+`aktiv` vorkommt, steht dort in **Prosa**. OpenAPI kann „dieses Feld gibt es nur,
+wenn `state` gleich `aktiv` ist“ nicht ausdrücken, ohne das Schema in drei
+`oneOf`-Varianten zu zerlegen – was die Beschreibung verdreifacht und kaum jemand
+liest.
+
+### Warum das kein Bruch ist
+
+`_embedded.customers` statt `items` wäre für jeden bestehenden Aufrufer ein Bruch.
+Deshalb wird HAL nicht eingebaut, sondern **danebengestellt**:
+
+```
+Accept: application/json       → { "items": [ … ], "nextCursor": … }   wie bisher
+Accept: application/hal+json   → { "_links": …, "_embedded": … }       neu
 ```
 
-### Warum das ein Fortschritt ist
+Eine Ressource, zwei Darstellungen, der Client wählt. Content Negotiation ist die
+eleganteste Antwort auf „wir müssen das Format ändern“, die HTTP zu bieten hat.
 
-Technisch tat das alte Format dasselbe. Der Unterschied liegt woanders:
+In der Swagger UI steht `application/hal+json` **an erster Stelle** – Du siehst
+dort also die HAL-Antwort, ohne etwas umzuschalten. Über das Feld *Media type*
+über dem Beispiel kommst Du zur gewohnten Darstellung zurück und siehst den
+Unterschied unmittelbar.
 
-- **Es ist bekannt.** Ein Client, der schon einmal Problem Details verarbeitet
-  hat, versteht auch diese Antwort. Beim eigenen Format fängt jeder bei null an.
-- **Es ist auswertbar.** `type` ist eine URI und benennt den Fehler eindeutig –
-  auch dann noch, wenn zwei Dienste denselben Statuscode benutzen. `title` und
-  `detail` darf man umformulieren, ohne jemanden zu brechen. Beim alten Format
-  hätte ein Client die `message` auseinandernehmen müssen.
-- **Es bleibt erweiterbar.** `errors` ist ein eigenes Feld und trotzdem
-  regelkonform. RFC 9457 sieht das ausdrücklich vor.
-
-### Die Frage, die dabei zuverlässig kommt
-
-*Warum steht der Statuscode zweimal da – in der Statuszeile und im Körper?*
-
-Weil der Körper weitergereicht, protokolliert und weitergeleitet wird, irgendwann
-ohne die Statuszeile. Die Redundanz ist Absicht.
-
-Ausführlich in [`docs/design.md`](docs/design.md#fehler).
+Ausführlich in [`docs/design.md`](docs/design.md#hypermedia).
 
 ## Die Stände
 
-Du bist im Stand `02-problem-details`. Er baut auf `01-paginierung` auf – jeder Stand
+Du bist im Stand `03-hypermedia-hal`. Er baut auf `02-problem-details` auf – jeder Stand
 ergänzt genau ein Thema, sodass der letzte die vollständige API zeigt. In der
 Swagger UI schaltest Du oben links zwischen ihnen um.
 
@@ -81,8 +107,8 @@ Swagger UI schaltest Du oben links zwischen ihnen um.
 | ----- | ------------- | ------- | ---- |
 | [`main`](https://atvantage-academy.github.io/sample-customer-api/?spec=main) | Der Kern: Ressourcen, Methoden, Statuscodes, Schemas | [Swagger UI](https://atvantage-academy.github.io/sample-customer-api/?spec=main) · [YAML](../../blob/main/openapi.yaml) | – |
 | [`01-paginierung`](https://atvantage-academy.github.io/sample-customer-api/?spec=01-paginierung) | Cursorbasiertes Blättern über die Kundenliste | [Swagger UI](https://atvantage-academy.github.io/sample-customer-api/?spec=01-paginierung) · [YAML](../../blob/01-paginierung/openapi.yaml) | [PR #2](https://github.com/atvantage-academy/sample-customer-api/pull/2) |
-| `02-problem-details` **· Du bist hier** | Fehlerformat nach RFC 9457 statt des eigenen | [Swagger UI](https://atvantage-academy.github.io/sample-customer-api/?spec=02-problem-details) · [YAML](../../blob/02-problem-details/openapi.yaml) | [PR #3](https://github.com/atvantage-academy/sample-customer-api/pull/3) |
-| [`03-hypermedia-hal`](https://atvantage-academy.github.io/sample-customer-api/?spec=03-hypermedia-hal) | HAL: Die Antwort trägt ihre nächsten Schritte mit | [Swagger UI](https://atvantage-academy.github.io/sample-customer-api/?spec=03-hypermedia-hal) · [YAML](../../blob/03-hypermedia-hal/openapi.yaml) | [PR #4](https://github.com/atvantage-academy/sample-customer-api/pull/4) |
+| [`02-problem-details`](https://atvantage-academy.github.io/sample-customer-api/?spec=02-problem-details) | Fehlerformat nach RFC 9457 statt des eigenen | [Swagger UI](https://atvantage-academy.github.io/sample-customer-api/?spec=02-problem-details) · [YAML](../../blob/02-problem-details/openapi.yaml) | [PR #3](https://github.com/atvantage-academy/sample-customer-api/pull/3) |
+| `03-hypermedia-hal` **· Du bist hier** | HAL: Die Antwort trägt ihre nächsten Schritte mit | [Swagger UI](https://atvantage-academy.github.io/sample-customer-api/?spec=03-hypermedia-hal) · [YAML](../../blob/03-hypermedia-hal/openapi.yaml) | [PR #4](https://github.com/atvantage-academy/sample-customer-api/pull/4) |
 | [`04-autorisierung`](https://atvantage-academy.github.io/sample-customer-api/?spec=04-autorisierung) | OAuth 2, Scopes, `401` und `403` | [Swagger UI](https://atvantage-academy.github.io/sample-customer-api/?spec=04-autorisierung) · [YAML](../../blob/04-autorisierung/openapi.yaml) | [PR #5](https://github.com/atvantage-academy/sample-customer-api/pull/5) |
 
 **Die Diff-Spalte ist der interessanteste Teil.** Jeder Stand hat einen Pull
