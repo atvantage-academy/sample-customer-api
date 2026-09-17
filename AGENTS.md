@@ -86,16 +86,42 @@ main ──► 01-paginierung ──► 02-problem-details ──► 03-hypermed
 | `03-hypermedia-hal` | HAL, zustandsabhängige Verweise | [#4](https://github.com/atvantage-academy/sample-customer-api/pull/4) |
 | `04-autorisierung` | OAuth 2, Scopes, `401`/`403` | [#5](https://github.com/atvantage-academy/sample-customer-api/pull/5) |
 
-**Die Pull Requests bleiben offen und werden NIE gemergt.** Sie sind das
-eigentliche Lehrmaterial: Jeder steht gegen seinen Vorgänger und zeigt Zeile für
+**Die Pull Requests bleiben offen und werden NIE gemergt – und die Branches
+werden nie gelöscht.** Sie sind das eigentliche Lehrmaterial: Jeder steht gegen seinen Vorgänger und zeigt Zeile für
 Zeile, was ein einzelnes Thema an einer fertigen API verändert. Wer einen davon
 mergt, zerstört genau das. In der Beschreibung jedes Pull Requests steht, worauf
 beim Lesen zu achten ist – wird der Branch geändert, gehört sie mitgezogen.
 
 # Arbeitsregeln für die Stände
 
-Diese drei Regeln halten die Diffs lesbar. Sie sind der Zweck des Repositories,
-nicht Kosmetik:
+## Die Stand-Branches werden NIEMALS gelöscht
+
+Auch nicht, wenn ein Stand neu gebaut wird. `01-paginierung`,
+`02-problem-details`, `03-hypermedia-hal` und `04-autorisierung` sind **dauerhaft**
+– sie sind kein Zwischenstand auf dem Weg nach `main`, sondern das Material selbst.
+
+Wer einen davon löscht, nimmt gleich vier Dinge mit:
+
+- den **Pull Request**, der daran hängt – mit seiner Beschreibung, seinen
+  Kommentaren und dem Diff, um den es geht,
+- den **Stand in der Swagger UI**, weil die Pipeline nur findet, was es als Branch
+  gibt,
+- jeden **Verweis darauf** aus den Kursunterlagen und aus den READMEs der anderen
+  Stände,
+- und die **Kette**: Der nachfolgende Stand hat keine Basis mehr.
+
+Muss ein Stand vollständig neu entstehen, geschieht das **im selben Branch** –
+neu aufsetzen, auf einen Commit bringen, `--force-with-lease` pushen. Der Branch
+behält seinen Namen, der Pull Request zieht nach, die Verweise bleiben gültig.
+Dasselbe gilt für die **Pull Requests**: Sie bleiben offen und werden weder
+gemergt noch geschlossen.
+
+Löschen gilt nur für **Feature-Branches**, über die Änderungen an `main` laufen.
+Die sind nach dem Merge erledigt.
+
+## Und diese drei halten die Diffs lesbar
+
+Sie sind der Zweck des Repositories, nicht Kosmetik:
 
 1. **Pro Branch genau ein Commit.** Änderungen an einem Stand werden in dessen
    bestehenden Commit **gesquasht**, nicht angehängt. Sonst zerfällt der Diff in
