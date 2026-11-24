@@ -60,9 +60,9 @@ tags:
     description: Bezahldaten – bewusst getrennt vom Kunden, weil anders geschützt
   - name: status
     description: |
-      Aktionen, die den Zustand eines Kundenkontos ändern: stilllegen und
-      wieder aktivieren (Kunde), sperren und entsperren (Betreiber). Der
-      Zustand selbst steht nur lesbar in `Customer.state`.
+      Aktionen, die den Zustand eines Kundenkontos ändern: stilllegen (Kunde),
+      sperren (Betreiber) und wieder aktivieren. Der Zustand selbst steht nur
+      lesbar in `Customer.state`.
 
 paths:
 
@@ -400,7 +400,7 @@ paths:
 
       **Bewusst als Aktion modelliert, nicht als Feld:** Der Zustand
       `Customer.state` ist nur lesbar, geändert wird er ausschließlich über
-      die vier Aktionen unter `/customers/{id}/status-actions/…`. So ist jeder
+      die drei Aktionen unter `/customers/{id}/status-actions/…`. So ist jeder
       Übergang benannt, einzeln berechtigbar und protokollierbar. Die
       Alternativen (Statusfeld per PATCH, Schalter per PUT/DELETE) stehen samt
       Begründung in `docs/design.md`.
@@ -439,44 +439,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /customers/{id}/status-actions/enable:
-    post:
-      tags: [status]
-      operationId: enableCustomer
-      summary: Das Konto wieder aktivieren (Kunde)
-      description: |
-        Hebt die Stilllegung auf. Idempotent wie alle Aktionen hier.
-      # Gehoerte eigentlich auf Pfadebene - Swagger UI loest dort bei
-      # OpenAPI 3.1 kein $ref auf. Begruendung: components/parameters.
-      parameters:
-        - $ref: '#/components/parameters/customerId'
-      responses:
-        '200':
-          description: Das Konto ist nicht mehr stillgelegt – auch wenn es das vorher schon nicht war
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Customer'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          description: |
-            Das Konto ist **gesperrt**. Eine Sperre hebt nur der Betreiber auf
-            (`unlock`), nicht der Kunde.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-
   /customers/{id}/status-actions/lock:
     description: |
       Der Betreiber sperrt das Konto.
-
-      **Warum eigene Aktionen und nicht dieselben wie beim Stilllegen?** Weil
-      es zwei verschiedene Vorgänge sind, die verschiedene Leute auslösen: Die
-      Stilllegung veranlasst der Kunde, die Sperre der Betreiber. Beide können
-      gleichzeitig gelten, und die Sperre hat Vorrang – `Customer.state` zeigt
-      dann `locked`.
     post:
       tags: [status]
       operationId: lockCustomer
@@ -508,21 +473,24 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
-  /customers/{id}/status-actions/unlock:
+  /customers/{id}/status-actions/enable:
+    description: |
+      Macht das Konto wieder aktiv – aus **jedem** Zustand. Damit nimmt der
+      Kunde eine Stilllegung zurück und der Betreiber eine Sperre.
     post:
       tags: [status]
-      operationId: unlockCustomer
-      summary: Die Sperre aufheben (Betreiber)
+      operationId: enableCustomer
+      summary: Das Konto wieder aktivieren
       description: |
-        Hebt **nur** die Sperre auf. Hatte der Kunde sein Konto vorher
-        stillgelegt, ist es danach `disabled` und nicht `active`.
+        Danach ist das Konto `active`, egal ob es vorher `disabled` oder
+        `locked` war. Idempotent wie alle Aktionen hier.
       # Gehoerte eigentlich auf Pfadebene - Swagger UI loest dort bei
       # OpenAPI 3.1 kein $ref auf. Begruendung: components/parameters.
       parameters:
         - $ref: '#/components/parameters/customerId'
       responses:
         '200':
-          description: Die Sperre ist aufgehoben – auch wenn es keine gab
+          description: Das Konto ist aktiv – auch wenn es das vorher schon war
           content:
             application/json:
               schema:
@@ -579,9 +547,9 @@ components:
     CustomerState:
       type: string
       description: |
-        Der Zustand eines Kundenkontos. **Ergibt sich aus den Aktionen** unter
-        `/customers/{id}/status-actions` und wird nicht direkt gesetzt: gesperrt
-        → `locked`, sonst stillgelegt → `disabled`, sonst `active`.
+        Der Zustand eines Kundenkontos. Wird **nicht direkt gesetzt**, sondern
+        über die Aktionen unter `/customers/{id}/status-actions`: `disable` →
+        `disabled`, `lock` → `locked`, `enable` → `active`.
       enum: [active, disabled, locked]
       default: active
 

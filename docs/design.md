@@ -134,40 +134,42 @@ deshalb PUT und nicht POST. Zweimal gesendet ändert nichts: idempotent.
 
 ```
 POST /customers/{id}/status-actions/disable   → 200 | 404 | 409   der Kunde legt still
-POST /customers/{id}/status-actions/enable    → 200 | 404 | 409   der Kunde reaktiviert
 POST /customers/{id}/status-actions/lock      → 200 | 404         der Betreiber sperrt
-POST /customers/{id}/status-actions/unlock    → 200 | 404         der Betreiber entsperrt
+POST /customers/{id}/status-actions/enable    → 200 | 404         wieder aktiv
 ```
 
 Den Status **liest** man am Kunden selbst (`GET /customers/{id}`, Feld `state`) –
 ein eigenes `GET` auf die Aktionen gibt es nicht, ebenso wenig `PUT` oder
 `DELETE`. Eine Aktion ist nichts, was man lesen oder löschen könnte.
 
-**Vier Aktionen, nicht drei** – weil es zwei verschiedene Vorgänge sind, die
-verschiedene Leute auslösen: Die **Stilllegung** veranlasst der Kunde („ich will
-hier weg“), die **Sperre** der Betreiber („Zahlungsrückstand“). Beide können
-gleichzeitig gelten. Ein einziges `activate` für beide Richtungen würde beim
-Entsperren auch die Stilllegung des Kunden zurücknehmen – gegen seinen Willen.
+Die erlaubten Übergänge:
 
-Daraus ergibt sich der Status, und zwar **abgeleitet**, nicht gesetzt:
+| von \ nach | `active` | `disabled` | `locked` |
+| ---------- | -------- | ---------- | -------- |
+| `active`   | `enable` (ändert nichts) | `disable` | `lock` |
+| `disabled` | `enable` | `disable` (ändert nichts) | `lock` |
+| `locked`   | `enable` | – `409` | `lock` (ändert nichts) |
 
-| gesperrt | stillgelegt | `state` |
-| -------- | ----------- | ------- |
-| –        | –           | `active` |
-| –        | ja          | `disabled` |
-| ja       | egal        | `locked` |
+Die Stilllegung veranlasst der Kunde („ich will hier weg“), die Sperre der
+Betreiber („Zahlungsrückstand“). Zwei Regeln ergeben sich daraus:
 
-Die Sperre hat Vorrang, und daraus folgen zwei Regeln:
-
-- Ein **gesperrtes** Konto lässt sich vom Kunden weder stilllegen noch
-  reaktivieren → `409`. Beides würde an der Sperre vorbei den Zustand ändern,
-  und das darf nur der Betreiber.
+- Ein **gesperrtes** Konto lässt sich **nicht** stilllegen → `409 Conflict`. Der
+  Übergang ist im aktuellen Zustand nicht erlaubt – eine Stilllegung wäre eine
+  Abschwächung der Sperre, und die darf der Kunde nicht selbst vornehmen.
 - Ein **stillgelegtes** Konto lässt sich sehr wohl sperren. Der Betreiber kommt
   immer durch.
 
-Und ein Fallstrick, der im Kurs zuverlässig auffällt: `unlock` macht ein Konto
-**nicht** automatisch aktiv. Hatte der Kunde es vorher stillgelegt, ist es danach
-`disabled`.
+`enable` führt aus **jedem** Zustand zurück nach `active` – es nimmt eine
+Stilllegung ebenso zurück wie eine Sperre. Wer ein gesperrtes Konto entsperrt,
+macht es damit aktiv, auch wenn der Kunde es vor der Sperre stillgelegt hatte.
+Das ist bewusst in Kauf genommen: ein Zustand, drei Aktionen, keine verborgene
+Vorgeschichte.
+
+*Warum `409` und nicht `412`?* `412 Precondition Failed` gehört zu **bedingten
+Anfragen**: Der Client schickt selbst eine Bedingung mit (`If-Match`,
+`If-Unmodified-Since`), und die trifft nicht zu. Hier hat der Client keine
+Bedingung gestellt – der Übergang kollidiert mit dem Zustand der Ressource, und
+dafür steht `409 Conflict`.
 
 **POST, und trotzdem idempotent.** POST *muss* nicht idempotent sein – er *darf*
 es, wenn der Vertrag es zusagt. Hier sagt er es zu: Ein zweites `lock` auf ein
@@ -175,8 +177,8 @@ gesperrtes Konto ändert nichts und antwortet wieder `200`. Ein Client, der nach
 einem Timeout wiederholt, richtet damit keinen Schaden an.
 
 **`200` mit dem Kunden, nicht `202`.** Die Antwort trägt den Kunden mit seinem
-neuen `state` – der Client sieht sofort, was die Aktion bewirkt hat, etwa dass
-das Konto nach `unlock` noch `disabled` ist. `202 Accepted` hieße: angenommen,
+neuen `state` – der Client sieht sofort, was die Aktion bewirkt hat, ohne
+ein zweites `GET`. `202 Accepted` hieße: angenommen,
 aber **noch nicht erledigt**. Das passt, wenn wirklich etwas im Hintergrund
 läuft – eine Bestellung, die erst geprüft, kommissioniert und verschickt wird.
 Dann gehört dazu eine Ressource für den Vorgang, auf die `Location` zeigt und die
@@ -235,9 +237,8 @@ PATCH /customers/{id}   { "state": "disabled" }
 
 Am einfachsten, und bei vielen Zuständen meist der praktischere Weg. Nachteil: Der
 Vorgang ist nicht sichtbar – man sieht den Zustand, nicht den Übergang. Wer welchen
-Wert setzen darf, muss dann am Wert entschieden werden statt an der Adresse. Und
-man sieht nicht mehr, **warum** jemand gesperrt ist, wenn er zusätzlich
-stillgelegt war.
+Wert setzen darf, muss dann am Wert entschieden werden statt an der Adresse, und
+welche Übergänge erlaubt sind, ebenfalls.
 
 *Alternative 2 – Schalter als Subressourcen:*
 
@@ -252,6 +253,8 @@ Idempotent schon durch die Methoden, ohne dass der Vertrag es eigens zusagen mus
 und jeder Schalter ist einzeln abfragbar. Nachteil: Ein Schalter ist ein
 technischer Begriff, kein fachlicher – „ein Flag löschen“ sagt im Fachbereich
 niemand. Und `DELETE` auf etwas, das man nie angelegt hat, liest sich seltsam.
+Ihre Stärke: Zwei unabhängige Schalter können **gleichzeitig** gelten. Das ist der
+Weg, wenn das Entsperren eine frühere Stilllegung nicht zurücknehmen darf.
 
 *Alternative 3 – jeder Vorgang als eigene Ressource:*
 
