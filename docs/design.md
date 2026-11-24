@@ -7,10 +7,9 @@ später bzw. in einem eigenen Kurs.
 **Annahme durchgehend:** JSON ist das einzige Austauschformat. `Accept` und
 `Content-Type` sind deshalb unten nicht bei jeder Operation erwähnt.
 
-> **Dies ist der Stand `02-problem-details`.** Er baut auf `01-paginierung` auf und
-> tauscht das Fehlerformat gegen den Standard – siehe [Fehler](#fehler). Die
-> übrigen Stände stehen unten unter
-> [Weiterführende Stände](#weiterführende-stände).
+> **Dies ist der Stand `03-hypermedia-hal`.** Er baut auf `02-problem-details` auf
+> und ergänzt HAL – siehe [Hypermedia](#hypermedia). Die übrigen Stände stehen
+> unten unter [Weiterführende Stände](#weiterführende-stände).
 
 ## Die Daten
 
@@ -189,6 +188,9 @@ der Client abfragt, bis er fertig ist. Eine Statusänderung ist dagegen ein
 Schreibvorgang auf einem Datensatz, und eine Sperre soll **sofort** greifen –
 nicht irgendwann.
 
+Diese Regeln muss ein Client nicht auswendig lernen – er kann sie aus der Antwort
+lesen. Wie, steht unter [Hypermedia](#hypermedia).
+
 ## Die Entscheidungen, über die man streiten kann
 
 Diese Stellen sind die, an denen im Kurs die Gruppen auseinandergehen. Keine der
@@ -334,6 +336,99 @@ Ein Statuscode für 500 Ergebnisse reicht nicht.
 Lesenswert dazu: [Bulk and Batch
 Operations](https://www.mscharhag.com/api-design/bulk-and-batch-operations).
 
+## Hypermedia
+
+Der Kunde trägt mit, was von ihm aus möglich ist – unter `_links`, nach **HAL**
+(*Hypertext Application Language*, Medientyp `application/hal+json`):
+
+```
+GET /customers/{id}
+Accept: application/hal+json
+
+→ 200  Content-Type: application/hal+json
+{
+  "id": "3fa85f64-…", "name": "Tom Mayer", "state": "active",
+  "_links": {
+    "self":       { "href": "/customers/3fa85f64-…" },
+    "address":    { "href": "/customers/3fa85f64-…/address" },
+    "payments":   { "href": "/customers/3fa85f64-…/payments" },
+    "disable":    { "href": "/customers/3fa85f64-…/status-actions/disable" },
+    "lock":       { "href": "/customers/3fa85f64-…/status-actions/lock" }
+  }
+}
+```
+
+### Der Punkt: Die Verweise hängen vom Zustand ab
+
+| `state` | vorhandene Beziehungen |
+| ------- | ---------------------- |
+| `active` | `self`, `address`, `payments`, `disable`, `lock` |
+| `disabled` | `self`, `address`, `payments`, `enable`, `lock` |
+| `locked` | `self`, `address`, `payments`, `enable` |
+
+Das ist dieselbe Regel wie unter [Den Status ändern](#den-status-ändern) – nur
+steht sie jetzt **in der Antwort** statt in der Dokumentation. Eine Oberfläche
+kann ihre Knöpfe daraus bauen, ohne zu wissen, was ein gesperrtes Konto ist. Ändert
+sich die Regel, ändert sich die Antwort, und der Client zieht ohne Änderung mit.
+
+**Genau hier lohnt sich Hypermedia**, und meistens nur hier: bei Abläufen mit
+mehreren Zuständen, bei denen nicht jeder Schritt immer erlaubt ist.
+
+### Und hier hört HAL auf
+
+Ein HAL-Link kennt `href`. **Eine Methode kennt er nicht.**
+
+`address` meint `GET` oder `PUT`, `disable` meint `POST`. In der Antwort steht
+davon nichts – die Bedeutung steckt allein im Namen der Beziehung, und den muss der
+Client vorher kennen. Bei den Status-Aktionen hilft eine Konvention: Unter
+`status-actions` wird **immer** gepostet. Eine Konvention ist aber Wissen, das der
+Client mitbringen muss – genau das, was Hypermedia ihm abnehmen wollte.
+
+Das ist keine Schlamperei im Entwurf, sondern die Grenze des Formats. Wer die
+Methode mitliefern will, braucht ein reicheres: **HAL-FORMS**, **Siren** oder
+**JSON:API**. Die Frage an die Gruppe lautet deshalb nicht „HAL ja oder nein“,
+sondern: *Wie viel muss der Client vorher wissen dürfen?*
+
+### Die Liste – und der unauffälligste Gewinn
+
+```
+GET /customers?limit=50
+Accept: application/hal+json
+
+→ 200
+{
+  "_links": {
+    "self": { "href": "/customers?limit=50" },
+    "next": { "href": "/customers?limit=50&cursor=eyJhZnRlciI6IjkxYzAxZjIzIn0" }
+  },
+  "_embedded": { "customers": [ … ] }
+}
+```
+
+**Der `next`-Verweis ist Hypermedia**, und ihn bauen dieselben Leute ganz
+selbstverständlich ein, die „Hypermedia brauchen wir nicht“ sagen. Der Client hängt
+den Cursor nicht mehr selbst an die Adresse – er folgt einem Link. Fehlt der Link,
+ist die Liste zu Ende.
+
+### Ohne Bruch: zwei Darstellungen nebeneinander
+
+`_embedded.customers` statt `items` wäre für jeden bestehenden Aufrufer ein
+**Bruch**. Deshalb wird HAL nicht eingebaut, sondern **danebengestellt**:
+
+```
+Accept: application/json       → { "items": [ … ], "nextCursor": … }   wie bisher
+Accept: application/hal+json   → { "_links": …, "_embedded": … }       neu
+```
+
+Eine Ressource, zwei Darstellungen, der Client wählt. Das ist Content Negotiation –
+und die eleganteste Antwort auf „wir müssen das Format ändern“, die HTTP zu bieten
+hat.
+
+In der Swagger UI steht `application/hal+json` **an erster Stelle** – Du siehst
+dort also die HAL-Antwort, ohne etwas umzuschalten. Über das Feld *Media type*
+über dem Beispiel kommst Du zur gewohnten Darstellung zurück und siehst den
+Unterschied unmittelbar.
+
 ## Fehler
 
 Alle Fehlerantworten folgen **RFC 9457** (*Problem Details for HTTP APIs*),
@@ -375,7 +470,7 @@ Eine Fehlerantwort geht nach außen.
 
 ## Weiterführende Stände
 
-Dieser Entwurf ist der Stand `02-problem-details`. Er baut auf `01-paginierung` auf, und
+Dieser Entwurf ist der Stand `03-hypermedia-hal`. Er baut auf `02-problem-details` auf, und
 darüber liegen weitere Stände. Die Swagger UI schaltet oben links zwischen ihnen
 um.
 
@@ -383,8 +478,8 @@ um.
 | ----- | ------------- | --------- | ---- |
 | [`main`](https://atvantage-academy.github.io/sample-customer-api/?spec=main) | Der Kern: Ressourcen, Methoden, Statuscodes, Schemas | – | – |
 | [`01-paginierung`](https://atvantage-academy.github.io/sample-customer-api/?spec=01-paginierung) | Cursorbasiertes Blättern über die Kundenliste | Best Practices | [PR #2](https://github.com/atvantage-academy/sample-customer-api/pull/2) |
-| `02-problem-details` **· Du bist hier** | Fehlerformat nach RFC 9457 statt des eigenen | Best Practices | [PR #3](https://github.com/atvantage-academy/sample-customer-api/pull/3) |
-| [`03-hypermedia-hal`](https://atvantage-academy.github.io/sample-customer-api/?spec=03-hypermedia-hal) | HAL: Die Antwort trägt ihre nächsten Schritte mit | Hypermedia und HAL | [PR #4](https://github.com/atvantage-academy/sample-customer-api/pull/4) |
+| [`02-problem-details`](https://atvantage-academy.github.io/sample-customer-api/?spec=02-problem-details) | Fehlerformat nach RFC 9457 statt des eigenen | Best Practices | [PR #3](https://github.com/atvantage-academy/sample-customer-api/pull/3) |
+| `03-hypermedia-hal` **· Du bist hier** | HAL: Die Antwort trägt ihre nächsten Schritte mit | Hypermedia und HAL | [PR #4](https://github.com/atvantage-academy/sample-customer-api/pull/4) |
 | [`04-autorisierung`](https://atvantage-academy.github.io/sample-customer-api/?spec=04-autorisierung) | OAuth 2, Scopes, `401` und `403` | Rund um die API | [PR #5](https://github.com/atvantage-academy/sample-customer-api/pull/5) |
 
 Was jeder Stand konkret ändert und **warum**, steht in der `README.md` des
