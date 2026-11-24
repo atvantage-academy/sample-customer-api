@@ -20,7 +20,7 @@ Ein Kunde hat:
 - ein **Geburtsdatum**
 - eine **Anschrift**
 - **Bezahlinformationen**: Kreditkarte und/oder PayPal
-- einen **Status**: `aktiv`, `deaktiviert`, `gesperrt`
+- einen **Status**: `active`, `disabled`, `locked` – nur lesbar, ein neuer Kunde ist `active`
 
 ## Die Ressourcen
 
@@ -31,8 +31,7 @@ Ein Kunde hat:
 /customers/{id}/payments                alle Bezahldaten
 /customers/{id}/payments/paypal         die PayPal-Daten
 /customers/{id}/payments/creditcard     die Kreditkartendaten
-/customers/{id}/flags/deactivation      der Deaktivierungs-Schalter
-/customers/{id}/flags/lock              der Sperr-Schalter
+/customers/{id}/status-actions/…        die Aktionen, die den Status ändern
 ```
 
 ## Warum die Kennung nicht die E-Mail-Adresse ist
@@ -50,7 +49,7 @@ angelegt wurde.
 ### Alle Kunden lesen
 
 ```
-GET /customers?state=aktiv
+GET /customers?state=active
 → 200  { "items": [ … ] }
 → 400  ungültiger Parameter
 ```
@@ -131,42 +130,59 @@ PUT /customers/{id}/address     → 204 | 400 | 404
 Es gibt genau **eine** Anschrift, und der Client kennt ihren Inhalt vollständig –
 deshalb PUT und nicht POST. Zweimal gesendet ändert nichts: idempotent.
 
-### Die zwei Schalter
+### Den Status ändern
 
 ```
-GET    /customers/{id}/flags/deactivation   → 200 | 404
-PUT    /customers/{id}/flags/deactivation   → 204 | 404 | 409
-DELETE /customers/{id}/flags/deactivation   → 204 | 404
-
-GET    /customers/{id}/flags/lock           → 200 | 404
-PUT    /customers/{id}/flags/lock           → 204 | 404
-DELETE /customers/{id}/flags/lock           → 204 | 404
+POST /customers/{id}/status-actions/disable   → 200 | 404 | 409   der Kunde legt still
+POST /customers/{id}/status-actions/enable    → 200 | 404 | 409   der Kunde reaktiviert
+POST /customers/{id}/status-actions/lock      → 200 | 404         der Betreiber sperrt
+POST /customers/{id}/status-actions/unlock    → 200 | 404         der Betreiber entsperrt
 ```
 
-**Zwei Schalter, nicht einer mit zwei Werten** – weil es zwei verschiedene Vorgänge
-sind, die verschiedene Leute auslösen: Die **Deaktivierung** veranlasst der Kunde
-(„ich will hier weg“), die **Sperre** der Betreiber („Zahlungsrückstand“). Beide
-können gleichzeitig gelten.
+Den Status **liest** man am Kunden selbst (`GET /customers/{id}`, Feld `state`) –
+ein eigenes `GET` auf die Aktionen gibt es nicht, ebenso wenig `PUT` oder
+`DELETE`. Eine Aktion ist nichts, was man lesen oder löschen könnte.
+
+**Vier Aktionen, nicht drei** – weil es zwei verschiedene Vorgänge sind, die
+verschiedene Leute auslösen: Die **Stilllegung** veranlasst der Kunde („ich will
+hier weg“), die **Sperre** der Betreiber („Zahlungsrückstand“). Beide können
+gleichzeitig gelten. Ein einziges `activate` für beide Richtungen würde beim
+Entsperren auch die Stilllegung des Kunden zurücknehmen – gegen seinen Willen.
 
 Daraus ergibt sich der Status, und zwar **abgeleitet**, nicht gesetzt:
 
-| Sperre | Deaktivierung | `state` |
-| ------ | ------------- | ------- |
-| –      | –             | `aktiv` |
-| –      | gesetzt       | `deaktiviert` |
-| gesetzt | egal         | `gesperrt` |
+| gesperrt | stillgelegt | `state` |
+| -------- | ----------- | ------- |
+| –        | –           | `active` |
+| –        | ja          | `disabled` |
+| ja       | egal        | `locked` |
 
 Die Sperre hat Vorrang, und daraus folgen zwei Regeln:
 
-- Ein **gesperrtes** Konto lässt sich **nicht** deaktivieren → `409`. Eine
-  Deaktivierung wäre eine Abschwächung, und die darf der Kunde nicht selbst
-  vornehmen.
-- Ein **deaktiviertes** Konto lässt sich sehr wohl sperren. Der Betreiber kommt
+- Ein **gesperrtes** Konto lässt sich vom Kunden weder stilllegen noch
+  reaktivieren → `409`. Beides würde an der Sperre vorbei den Zustand ändern,
+  und das darf nur der Betreiber.
+- Ein **stillgelegtes** Konto lässt sich sehr wohl sperren. Der Betreiber kommt
   immer durch.
 
-Und ein Fallstrick, der im Kurs zuverlässig auffällt: `DELETE …/flags/lock` macht
-ein Konto **nicht** automatisch aktiv. War zusätzlich die Deaktivierung gesetzt,
-ist es danach `deaktiviert`. Wer zwei Schalter baut, muss beide zurückdrehen.
+Und ein Fallstrick, der im Kurs zuverlässig auffällt: `unlock` macht ein Konto
+**nicht** automatisch aktiv. Hatte der Kunde es vorher stillgelegt, ist es danach
+`disabled`.
+
+**POST, und trotzdem idempotent.** POST *muss* nicht idempotent sein – er *darf*
+es, wenn der Vertrag es zusagt. Hier sagt er es zu: Ein zweites `lock` auf ein
+gesperrtes Konto ändert nichts und antwortet wieder `200`. Ein Client, der nach
+einem Timeout wiederholt, richtet damit keinen Schaden an.
+
+**`200` mit dem Kunden, nicht `202`.** Die Antwort trägt den Kunden mit seinem
+neuen `state` – der Client sieht sofort, was die Aktion bewirkt hat, etwa dass
+das Konto nach `unlock` noch `disabled` ist. `202 Accepted` hieße: angenommen,
+aber **noch nicht erledigt**. Das passt, wenn wirklich etwas im Hintergrund
+läuft – eine Bestellung, die erst geprüft, kommissioniert und verschickt wird.
+Dann gehört dazu eine Ressource für den Vorgang, auf die `Location` zeigt und die
+der Client abfragt, bis er fertig ist. Eine Statusänderung ist dagegen ein
+Schreibvorgang auf einem Datensatz, und eine Sperre soll **sofort** greifen –
+nicht irgendwann.
 
 ## Die Entscheidungen, über die man streiten kann
 
@@ -202,34 +218,51 @@ man sie doch braucht? Zwei Wege: eine eigene Ressource (`/customers-with-payment
 saubere Trennung der Schemas) oder ein Parameter (`/customers?include=payments`,
 kombinierbar mit Filtern und Paginierung, dafür ohne getrennte Schemas).
 
-### Deaktivieren: Feld, Aktion oder Schalter?
+### Stilllegen: Feld, Aktion oder Schalter?
 
-**Gewählt: Schalter als Subressourcen** (siehe [oben](#die-zwei-schalter)).
+**Gewählt: Aktionen** (siehe [oben](#den-status-ändern)).
 
-*Warum:* **idempotent** (zweimal deaktivieren ändert nichts), lesbar, und jeder
-Zustand ist einzeln abfragbar. Es ist der einzige der drei Wege, bei dem ein
-wiederholter Aufruf garantiert harmlos ist.
+*Warum:* Jeder Übergang hat einen Namen. Das macht ihn lesbar, einzeln
+berechtigbar – stilllegen darf der Kunde, sperren nur der Betreiber – und
+protokollierbar, mit Grund. Und der Status bleibt, was er ist: ein Ergebnis, das
+man liest, kein Feld, das man setzt.
 
 *Alternative 1 – Status als Feld:*
 
 ```
-PATCH /customers/{id}   { "state": "deaktiviert" }
+PATCH /customers/{id}   { "state": "disabled" }
 ```
 
 Am einfachsten, und bei vielen Zuständen meist der praktischere Weg. Nachteil: Der
-Vorgang ist nicht sichtbar – man sieht den Zustand, nicht den Übergang. Und man
-sieht nicht mehr, **warum** jemand gesperrt ist, wenn er zusätzlich deaktiviert war.
+Vorgang ist nicht sichtbar – man sieht den Zustand, nicht den Übergang. Wer welchen
+Wert setzen darf, muss dann am Wert entschieden werden statt an der Adresse. Und
+man sieht nicht mehr, **warum** jemand gesperrt ist, wenn er zusätzlich
+stillgelegt war.
 
-*Alternative 2 – die Aktion als Ressource:*
+*Alternative 2 – Schalter als Subressourcen:*
+
+```
+PUT    /customers/{id}/flags/deactivation   → 204   stilllegen
+DELETE /customers/{id}/flags/deactivation   → 204   reaktivieren
+PUT    /customers/{id}/flags/lock           → 204   sperren
+DELETE /customers/{id}/flags/lock           → 204   entsperren
+```
+
+Idempotent schon durch die Methoden, ohne dass der Vertrag es eigens zusagen muss,
+und jeder Schalter ist einzeln abfragbar. Nachteil: Ein Schalter ist ein
+technischer Begriff, kein fachlicher – „ein Flag löschen“ sagt im Fachbereich
+niemand. Und `DELETE` auf etwas, das man nie angelegt hat, liest sich seltsam.
+
+*Alternative 3 – jeder Vorgang als eigene Ressource:*
 
 ```
 POST /customers/{id}/deactivations   → 201
 POST /customers/{id}/activations     → 201
 ```
 
-Der Vorgang ist benannt und lässt sich protokollieren, mit Zeitpunkt und Grund. Das
-ist der stärkste Weg, wenn eine **Historie** gebraucht wird. Nachteil: nicht
-idempotent.
+Der stärkste Weg, wenn eine **Historie** gebraucht wird: Jeder Vorgang bekommt
+eine eigene Adresse und lässt sich später wieder lesen. Nachteil: nicht
+idempotent – jeder Aufruf legt einen neuen Vorgang an.
 
 **Die Entscheidungsfragen:** Braucht Ihr eine Historie? Muss der Aufruf wiederholbar
 sein? Wie viele Zustände gibt es – und kommen noch welche dazu?

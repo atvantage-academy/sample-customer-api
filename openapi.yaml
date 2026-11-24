@@ -58,10 +58,11 @@ tags:
     description: Die Anschrift eines Kunden
   - name: payments
     description: Bezahldaten – bewusst getrennt vom Kunden, weil anders geschützt
-  - name: flags
+  - name: status
     description: |
-      Schalter am Kundenkonto: die Deaktivierung und die Sperre. Aus ihnen
-      ergibt sich der Zustand, den `Customer.state` anzeigt.
+      Aktionen, die den Zustand eines Kundenkontos ändern: stilllegen und
+      wieder aktivieren (Kunde), sperren und entsperren (Betreiber). Der
+      Zustand selbst steht nur lesbar in `Customer.state`.
 
 paths:
 
@@ -393,39 +394,23 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
-  /customers/{id}/flags/deactivation:
+  /customers/{id}/status-actions/disable:
     description: |
-      Der Deaktivierungs-Schalter. Gesetzt = der Kunde hat sein Konto stillgelegt.
+      Der Kunde legt sein Konto still.
 
-      Bewusst als Schalter und nicht als Aktion modelliert: So sind Deaktivieren
-      und Aktivieren **idempotent** und der Zustand ist einzeln abfragbar. Die
-      Alternativen (Statusfeld per PATCH, Aktivitätsressource per POST) stehen
-      samt Begründung in `docs/design.md`.
-    get:
-      tags: [flags]
-      operationId: readDeactivationFlag
-      summary: Ist das Konto deaktiviert?
-      # Gehoerte eigentlich auf Pfadebene - Swagger UI loest dort bei
-      # OpenAPI 3.1 kein $ref auf. Begruendung: components/parameters.
-      parameters:
-        - $ref: '#/components/parameters/customerId'
-      responses:
-        '200':
-          description: Der Schalter ist gesetzt – das Konto ist deaktiviert
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DeactivationFlag'
-        '404':
-          description: Kunde unbekannt, oder der Schalter ist nicht gesetzt
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-    put:
-      tags: [flags]
-      operationId: setDeactivationFlag
-      summary: Das Konto deaktivieren
+      **Bewusst als Aktion modelliert, nicht als Feld:** Der Zustand
+      `Customer.state` ist nur lesbar, geändert wird er ausschließlich über
+      die vier Aktionen unter `/customers/{id}/status-actions/…`. So ist jeder
+      Übergang benannt, einzeln berechtigbar und protokollierbar. Die
+      Alternativen (Statusfeld per PATCH, Schalter per PUT/DELETE) stehen samt
+      Begründung in `docs/design.md`.
+    post:
+      tags: [status]
+      operationId: disableCustomer
+      summary: Das Konto stilllegen (Kunde)
+      description: |
+        **POST, und trotzdem idempotent** – das sagt dieser Vertrag zu: Ein
+        zweiter Aufruf ändert nichts und antwortet ebenfalls `200`.
       # Gehoerte eigentlich auf Pfadebene - Swagger UI loest dort bei
       # OpenAPI 3.1 kein $ref auf. Begruendung: components/parameters.
       parameters:
@@ -435,71 +420,70 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/DeactivationFlag'
+              $ref: '#/components/schemas/StatusReason'
       responses:
-        '204':
-          description: Das Konto ist deaktiviert – auch wenn es das vorher schon war
+        '200':
+          description: Das Konto ist stillgelegt – auch wenn es das vorher schon war
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
           description: |
             Das Konto ist **gesperrt**. Eine Sperre ist stärker als eine
-            Deaktivierung und lässt sich nicht von ihr überschreiben.
+            Stilllegung und lässt sich nicht von ihr überschreiben.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-    delete:
-      tags: [flags]
-      operationId: clearDeactivationFlag
-      summary: Das Konto wieder aktivieren
-      # Gehoerte eigentlich auf Pfadebene - Swagger UI loest dort bei
-      # OpenAPI 3.1 kein $ref auf. Begruendung: components/parameters.
-      parameters:
-        - $ref: '#/components/parameters/customerId'
-      responses:
-        '204':
-          description: Das Konto ist nicht mehr deaktiviert – auch wenn es das vorher schon nicht war
-        '404':
-          $ref: '#/components/responses/NotFound'
 
-  /customers/{id}/flags/lock:
-    description: |
-      Der Sperr-Schalter. Gesetzt = das Konto ist gesperrt.
-
-      **Warum ein zweiter Schalter und kein zweiter Wert im selben?** Weil es
-      zwei verschiedene Vorgänge sind, die verschiedene Leute auslösen: Die
-      Deaktivierung veranlasst der Kunde, die Sperre der Betreiber. Beide können
-      gleichzeitig gelten, und die Sperre hat Vorrang – `Customer.state` zeigt
-      dann `gesperrt`.
-    get:
-      tags: [flags]
-      operationId: readLockFlag
-      summary: Ist das Konto gesperrt?
+  /customers/{id}/status-actions/enable:
+    post:
+      tags: [status]
+      operationId: enableCustomer
+      summary: Das Konto wieder aktivieren (Kunde)
+      description: |
+        Hebt die Stilllegung auf. Idempotent wie alle Aktionen hier.
       # Gehoerte eigentlich auf Pfadebene - Swagger UI loest dort bei
       # OpenAPI 3.1 kein $ref auf. Begruendung: components/parameters.
       parameters:
         - $ref: '#/components/parameters/customerId'
       responses:
         '200':
-          description: Der Schalter ist gesetzt – das Konto ist gesperrt
+          description: Das Konto ist nicht mehr stillgelegt – auch wenn es das vorher schon nicht war
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/LockFlag'
+                $ref: '#/components/schemas/Customer'
         '404':
-          description: Kunde unbekannt, oder der Schalter ist nicht gesetzt
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: |
+            Das Konto ist **gesperrt**. Eine Sperre hebt nur der Betreiber auf
+            (`unlock`), nicht der Kunde.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-    put:
-      tags: [flags]
-      operationId: setLockFlag
-      summary: Das Konto sperren
+
+  /customers/{id}/status-actions/lock:
+    description: |
+      Der Betreiber sperrt das Konto.
+
+      **Warum eigene Aktionen und nicht dieselben wie beim Stilllegen?** Weil
+      es zwei verschiedene Vorgänge sind, die verschiedene Leute auslösen: Die
+      Stilllegung veranlasst der Kunde, die Sperre der Betreiber. Beide können
+      gleichzeitig gelten, und die Sperre hat Vorrang – `Customer.state` zeigt
+      dann `locked`.
+    post:
+      tags: [status]
+      operationId: lockCustomer
+      summary: Das Konto sperren (Betreiber)
       description: |
-        Geht aus **jedem** Zustand – ein deaktiviertes Konto darf ebenso gesperrt
-        werden wie ein aktives.
+        Geht aus **jedem** Zustand – ein stillgelegtes Konto darf ebenso
+        gesperrt werden wie ein aktives.
       # Gehoerte eigentlich auf Pfadebene - Swagger UI loest dort bei
       # OpenAPI 3.1 kein $ref auf. Begruendung: components/parameters.
       parameters:
@@ -509,26 +493,40 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/LockFlag'
+              $ref: '#/components/schemas/StatusReason'
+            examples:
+              rueckstand:
+                summary: Mit Grund
+                value: { reason: 'Zahlungsrückstand' }
       responses:
-        '204':
+        '200':
           description: Das Konto ist gesperrt – auch wenn es das vorher schon war
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
         '404':
           $ref: '#/components/responses/NotFound'
-    delete:
-      tags: [flags]
-      operationId: clearLockFlag
-      summary: Die Sperre aufheben
+
+  /customers/{id}/status-actions/unlock:
+    post:
+      tags: [status]
+      operationId: unlockCustomer
+      summary: Die Sperre aufheben (Betreiber)
       description: |
-        Hebt **nur** die Sperre auf. War das Konto vorher zusätzlich deaktiviert,
-        ist es danach deaktiviert und nicht aktiv.
+        Hebt **nur** die Sperre auf. Hatte der Kunde sein Konto vorher
+        stillgelegt, ist es danach `disabled` und nicht `active`.
       # Gehoerte eigentlich auf Pfadebene - Swagger UI loest dort bei
       # OpenAPI 3.1 kein $ref auf. Begruendung: components/parameters.
       parameters:
         - $ref: '#/components/parameters/customerId'
       responses:
-        '204':
+        '200':
           description: Die Sperre ist aufgehoben – auch wenn es keine gab
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
         '404':
           $ref: '#/components/responses/NotFound'
 
@@ -581,10 +579,11 @@ components:
     CustomerState:
       type: string
       description: |
-        Der Zustand eines Kundenkontos. **Ergibt sich aus den Schaltern** unter
-        `/customers/{id}/flags` und wird nicht direkt gesetzt: Sperre gesetzt →
-        `gesperrt`, sonst Deaktivierung gesetzt → `deaktiviert`, sonst `aktiv`.
-      enum: [aktiv, deaktiviert, gesperrt]
+        Der Zustand eines Kundenkontos. **Ergibt sich aus den Aktionen** unter
+        `/customers/{id}/status-actions` und wird nicht direkt gesetzt: gesperrt
+        → `locked`, sonst stillgelegt → `disabled`, sonst `active`.
+      enum: [active, disabled, locked]
+      default: active
 
     Customer:
       type: object
@@ -612,8 +611,8 @@ components:
             - $ref: '#/components/schemas/CustomerState'
           readOnly: true
           description: |
-            Nur lesbar. Geändert wird der Zustand über die Schalter unter
-            `/customers/{id}/flags/…`.
+            Nur lesbar, ein neuer Kunde ist `active`. Geändert wird der
+            Zustand über die Aktionen unter `/customers/{id}/status-actions/…`.
 
     CustomerPatch:
       type: object
@@ -697,30 +696,14 @@ components:
         creditcard:
           $ref: '#/components/schemas/CreditCard'
 
-    DeactivationFlag:
+    StatusReason:
       type: object
+      description: Optionaler Grund für das Stilllegen oder Sperren
       properties:
         reason:
           type: string
           maxLength: 200
-          description: Optionaler Grund der Deaktivierung
-        since:
-          type: string
-          format: date-time
-          readOnly: true
-
-    LockFlag:
-      type: object
-      properties:
-        reason:
-          type: string
-          maxLength: 200
-          description: Optionaler Grund der Sperre
           examples: ['Zahlungsrückstand']
-        since:
-          type: string
-          format: date-time
-          readOnly: true
 
     Error:
       type: object
